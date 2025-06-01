@@ -84,29 +84,42 @@ st.markdown(
 
 # --- Sidebar ---
 with st.sidebar:
-    
+
     # Logo
     st.image("logo_danu.png", width=180)
-    
-    # Filtros
+
+    if 'df' in st.session_state:
+        df_sidebar = st.session_state['df'].copy()
+        df_sidebar['orden_pago_aprobado'] = pd.to_datetime(df_sidebar['orden_pago_aprobado'], errors='coerce')
+        df_sidebar = df_sidebar.dropna(subset=['orden_pago_aprobado'])
+
+        # Crear columna Año-Mes para filtrar
+        df_sidebar['Periodo'] = df_sidebar['orden_pago_aprobado'].dt.to_period("M").astype(str)
+        periodos = sorted(df_sidebar['Periodo'].unique(), reverse=True)
+        regiones = sorted(df_sidebar['region'].dropna().unique())
+        categorias = sorted(df_sidebar['categoria_simplificada'].dropna().unique())
+    else:
+        periodos = []
+        regiones = []
+        categorias = []
+
+    # Filtros dinámicos
     st.markdown("### Filtros")
-    st.selectbox("Periodo", ["Último mes"])
-    st.selectbox("Región", ["Todas las regiones"])
-    st.selectbox("Categoría", ["Todas las categorías"])
+    periodo_sel = st.selectbox("Periodo", ["Todos los periodos"] + periodos)
+    region_sel = st.selectbox("Región", ["Todas las regiones"] + regiones)
+    categoria_sel = st.selectbox("Categoría", ["Todas las categorías"] + categorias)
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-    
-    # Recomendaciones
+
+    # Recomendaciones (NO BORRADO)
     st.markdown(f"### <span style='color:{COLOR_PRIMARY};'>Recomendaciones</span>", unsafe_allow_html=True)
     st.checkbox("Optimizar rutas de entrega\nReducir tiempos en zona Este")
     st.checkbox("Aumentar capacidad logística\nAlmacenamiento en Barcelona")
     st.checkbox("Promocionar Electrónica\nMayor margen de beneficio")
     st.checkbox("Revisar proveedores\nReducir costos de envío")
     st.checkbox("Implementar seguimiento GPS\nPara entregas en tiempo real")
-    
-    # Línea divisoria
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-    
-    # Botón para subir base de datos
+
+    # Botón para subir base de datos (AL FINAL)
     uploaded_file = st.file_uploader(
         "Subir base de datos",
         type=["csv", "xlsx", "xls", "txt", "parquet"],
@@ -130,42 +143,77 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Error al cargar el archivo: {str(e)}")
 
-# --- KPIs en tarjetas blancas ---
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.markdown(
-        f"""<div class="kpi-card">
-                <div class="kpi-label">Ingresos Totales</div>
-                <div class="kpi-value">$48,250</div>
-                <div class="kpi-delta-pos">+8.3% ↑</div>
-                <div class="kpi-subtext">vs mes anterior</div>
-            </div>""", unsafe_allow_html=True)
-with col2:
-    st.markdown(
-        f"""<div class="kpi-card">
-                <div class="kpi-label">Pedidos Totales</div>
-                <div class="kpi-value">248</div>
-                <div class="kpi-delta-pos">+12% ↑</div>
-                <div class="kpi-subtext">vs mes anterior</div>
-            </div>""", unsafe_allow_html=True)
-with col3:
-    st.markdown(
-        f"""<div class="kpi-card">
-                <div class="kpi-label">Valor Promedio</div>
-                <div class="kpi-value">$194.56</div>
-                <div class="kpi-delta-neg">-3.2% ↓</div>
-                <div class="kpi-subtext">vs trimestre anterior</div>
-            </div>""", unsafe_allow_html=True)
-with col4:
-    st.markdown(
-        f"""<div class="kpi-card">
-                <div class="kpi-label">Flete Promedio</div>
-                <div class="kpi-value">$12.75</div>
-                <div class="kpi-delta-pos">+1.5% ↑</div>
-                <div class="kpi-subtext">vs año anterior</div>
-            </div>""", unsafe_allow_html=True)
+# --- Procesamiento y KPIs dinámicas ---
+if 'df' in st.session_state:
+    df = st.session_state['df'].copy()
+    df['fecha'] = pd.to_datetime(df['orden_pago_aprobado'], errors='coerce')
+    df = df.dropna(subset=['fecha'])
+    df['trimestre'] = df['fecha'].dt.to_period('Q')
+    df['año'] = df['fecha'].dt.year
+    df['mes'] = df['fecha'].dt.month
 
-st.markdown("<br>", unsafe_allow_html=True)
+    # Ingresos Totales
+    ingresos_totales = df['precio_promedio_por_orden'].sum()
+    mes_actual = df['mes'].max()
+    anio_actual = df['año'].max()
+    mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
+    ingresos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
+    ingresos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
+    delta_ingresos = ((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100 if ingresos_mes_anterior != 0 else 0
+
+    # Pedidos Totales
+    pedidos_totales = df['order_id'].nunique()
+    pedidos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['order_id'].nunique()
+    pedidos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['order_id'].nunique()
+    delta_pedidos = ((pedidos_mes_actual - pedidos_mes_anterior) / pedidos_mes_anterior) * 100 if pedidos_mes_anterior != 0 else 0
+
+    # Valor Promedio
+    valor_trimestre_actual = df[df['trimestre'] == df['trimestre'].max()]['precio_promedio_por_orden'].mean()
+    valor_trimestre_anterior = df[df['trimestre'] == df['trimestre'].max() - 1]['precio_promedio_por_orden'].mean()
+    delta_valor = ((valor_trimestre_actual - valor_trimestre_anterior) / valor_trimestre_anterior) * 100 if valor_trimestre_anterior != 0 else 0
+
+    # Flete Promedio
+    flete_actual = df[df['año'] == anio_actual]['costo_de_flete'].mean()
+    flete_anterior = df[df['año'] == anio_actual - 1]['costo_de_flete'].mean()
+    delta_flete = ((flete_actual - flete_anterior) / flete_anterior) * 100 if flete_anterior != 0 else 0
+
+    # Renderizar tarjetas
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown(
+            f"""<div class="kpi-card">
+                    <div class="kpi-label">Ingresos Totales</div>
+                    <div class="kpi-value">${ingresos_totales:,.0f}</div>
+                    <div class="kpi-delta-pos">{delta_ingresos:+.1f}% ↑</div>
+                    <div class="kpi-subtext">vs mes anterior</div>
+                </div>""", unsafe_allow_html=True)
+    with col2:
+        st.markdown(
+            f"""<div class="kpi-card">
+                    <div class="kpi-label">Pedidos Totales</div>
+                    <div class="kpi-value">{pedidos_totales:,}</div>
+                    <div class="kpi-delta-pos">{delta_pedidos:+.1f}% ↑</div>
+                    <div class="kpi-subtext">vs mes anterior</div>
+                </div>""", unsafe_allow_html=True)
+    with col3:
+        st.markdown(
+            f"""<div class="kpi-card">
+                    <div class="kpi-label">Valor Promedio</div>
+                    <div class="kpi-value">${valor_trimestre_actual:,.2f}</div>
+                    <div class="kpi-delta-neg">{delta_valor:+.1f}% ↓</div>
+                    <div class="kpi-subtext">vs trimestre anterior</div>
+                </div>""", unsafe_allow_html=True)
+    with col4:
+        st.markdown(
+            f"""<div class="kpi-card">
+                    <div class="kpi-label">Flete Promedio</div>
+                    <div class="kpi-value">${flete_actual:,.2f}</div>
+                    <div class="kpi-delta-pos">{delta_flete:+.1f}% ↑</div>
+                    <div class="kpi-subtext">vs año anterior</div>
+                </div>""", unsafe_allow_html=True)
+else:
+    st.info("Sube primero la base de datos para ver las métricas.")
+
 
 # --- Gráfica de tendencia de ingresos con predicción CONTINUA ---
 if 'df' in st.session_state:
@@ -225,7 +273,45 @@ if 'df' in st.session_state:
 else:
     st.info("Sube primero el archivo de datos reales para ver la gráfica.")
 
-# Línea divisoria entre gráfica de tendencia y las dos gráficas de abajo
+# --- Cálculo de métricas con columnas corregidas ---
+import numpy as np
+
+# Convertimos la fecha correcta
+df['fecha'] = pd.to_datetime(df['orden_pago_aprobado'], errors='coerce')
+df = df.dropna(subset=['fecha'])
+df['trimestre'] = df['fecha'].dt.to_period('Q')
+df['año'] = df['fecha'].dt.year
+df['mes'] = df['fecha'].dt.month
+
+# --- Ingresos Totales ---
+ingresos_totales = df['precio_promedio_por_orden'].sum()
+
+# Variación mensual de ingresos
+mes_actual = df['mes'].max()
+anio_actual = df['año'].max()
+mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
+
+ingresos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
+ingresos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
+delta_ingresos = ((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100 if ingresos_mes_anterior != 0 else 0
+
+# --- Pedidos Totales ---
+pedidos_totales = df['order_id'].nunique()
+pedidos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['order_id'].nunique()
+pedidos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['order_id'].nunique()
+delta_pedidos = ((pedidos_mes_actual - pedidos_mes_anterior) / pedidos_mes_anterior) * 100 if pedidos_mes_anterior != 0 else 0
+
+# --- Valor Promedio ---
+valor_trimestre_actual = df[df['trimestre'] == df['trimestre'].max()]['precio_promedio_por_orden'].mean()
+valor_trimestre_anterior = df[df['trimestre'] == df['trimestre'].max() - 1]['precio_promedio_por_orden'].mean()
+delta_valor = ((valor_trimestre_actual - valor_trimestre_anterior) / valor_trimestre_anterior) * 100 if valor_trimestre_anterior != 0 else 0
+
+# --- Flete Promedio ---
+flete_actual = df[df['año'] == anio_actual]['costo_de_flete'].mean()
+flete_anterior = df[df['año'] == anio_actual - 1]['costo_de_flete'].mean()
+delta_flete = ((flete_actual - flete_anterior) / flete_anterior) * 100 if flete_anterior != 0 else 0
+
+#Linea divisora
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
 # --- Segunda fila de visualizaciones ---
