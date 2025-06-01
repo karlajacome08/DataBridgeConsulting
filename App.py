@@ -222,14 +222,42 @@ if 'df' in st.session_state:
     # Convertir a fecha y extraer mes
     df_real['orden_pago_aprobado'] = pd.to_datetime(df_real['orden_pago_aprobado'], errors='coerce')
     df_real = df_real.dropna(subset=['orden_pago_aprobado', 'precio_final'])
-
     df_real['Mes'] = df_real['orden_pago_aprobado'].dt.month
-    ingresos_reales = df_real.groupby('Mes')['precio_final'].sum().reset_index()
+
+    # Agrupar ingresos reales por mes y ordenar
+    ingresos_reales = (
+        df_real
+        .groupby('Mes')['precio_final']
+        .sum()
+        .reset_index()
+        .sort_values(by='Mes')
+    )
+    ingresos_reales['MesIndex'] = ingresos_reales['Mes']  
     ingresos_reales['MesNombre'] = ingresos_reales['Mes'].apply(lambda x: calendar.month_name[x])
 
+    #Siguientes 3 meses
+    ultimo_mes_real = ingresos_reales['Mes'].max()
+    futuros_numeros = [ultimo_mes_real + i for i in range(1, 4)]              
+    meses_futuros = [((ultimo_mes_real + i - 1) % 12) + 1 for i in range(1, 4)]  
+    meses_futuros_nombres = [calendar.month_name[m] for m in meses_futuros]     
+
+    #Valores (dummies) de prediccion
+    pred1 = 4890000   
+    pred2 = 570000   
+    pred3 = 520600   
+    valores_dummie = [pred1, pred2, pred3]
+
+    df_dummie = pd.DataFrame({
+        'MesIndex': futuros_numeros,         
+        'Mes': meses_futuros,                
+        'MesNombre': meses_futuros_nombres,  
+        'precio_final': valores_dummie       
+    })
+
+    # Figura con datos reales
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=ingresos_reales['MesNombre'],
+        x=ingresos_reales['MesIndex'],
         y=ingresos_reales['precio_final'],
         mode='lines+markers',
         name='Datos reales',
@@ -237,27 +265,61 @@ if 'df' in st.session_state:
         marker=dict(size=8, color=COLOR_PRIMARY)
     ))
 
-    # Buscar predicciones si se suben
+    #Figura predicha (ultimo real + datos predichos)
+    ultimo_indice = ingresos_reales['MesIndex'].iloc[-1]      
+    ultimo_valor = ingresos_reales['precio_final'].iloc[-1]   
+
+    # Construir la secuencia X e Y para la línea dummy:
+    x_dummy = [ultimo_indice] + df_dummie['MesIndex'].tolist()           
+    y_dummy = [ultimo_valor] + df_dummie['precio_final'].tolist()         
+
+    # Ocultar el marcador en el primer punto (último real) usando lista de tamaños:
+    marker_sizes = [0] + [8] * len(df_dummie)   
+    marker_colors = ['rgba(0,0,0,0)'] + ['#AAAAAA'] * len(df_dummie)
+
+    fig.add_trace(go.Scatter(
+        x=x_dummy,
+        y=y_dummy,
+        mode='lines+markers',
+        name='Predicción (dummie)',
+        line=dict(color='#AAAAAA', width=2, dash='dot'),
+        marker=dict(size=marker_sizes, color=marker_colors)
+    ))
+
+    #Subir archivo de prediccion
     pred_file = st.file_uploader("Sube archivo de predicción mensual", type=["csv", "xlsx"])
     if pred_file:
         try:
             ext = pred_file.name.split(".")[-1]
             df_pred = pd.read_csv(pred_file) if ext == "csv" else pd.read_excel(pred_file)
+
             if 'Mes' in df_pred.columns and 'Ingreso_Predicho' in df_pred.columns:
+                df_pred['Mes'] = df_pred['Mes'].astype(int)
+                df_pred = df_pred.sort_values(by='Mes')
+                df_pred['MesIndex'] = df_pred['Mes']
                 df_pred['MesNombre'] = df_pred['Mes'].apply(lambda x: calendar.month_name[int(x)])
                 fig.add_trace(go.Scatter(
-                    x=df_pred['MesNombre'],
+                    x=df_pred['MesIndex'],
                     y=df_pred['Ingreso_Predicho'],
                     mode='lines+markers',
-                    name='Predicción',
-                    line=dict(color='#AAAAAA', width=2, dash='dot'),
-                    marker=dict(symbol='x', size=8, color='#AAAAAA')
+                    name='Predicción (archivo)',
+                    line=dict(color='#666666', width=2, dash='dot'),
+                    marker=dict(symbol='x', size=8, color='#666666')
                 ))
-                st.success("Predicción agregada a la gráfica.")
+                st.success("Predicción cargada desde archivo y agregada a la gráfica.")
             else:
                 st.warning("El archivo de predicción debe tener columnas 'Mes' e 'Ingreso_Predicho'.")
         except Exception as e:
             st.error(f"Error al leer archivo de predicción: {e}")
+
+    #Configurar con las etiquetas repetidas
+    idx_reales = ingresos_reales['MesIndex'].tolist()         
+    idx_dummie = df_dummie['MesIndex'].tolist()               
+    todos_los_indices = idx_reales + idx_dummie
+
+    labels_reales = ingresos_reales['MesNombre'].tolist()    
+    labels_dummie = df_dummie['MesNombre'].tolist()          
+    todas_las_etiquetas = labels_reales + labels_dummie
 
     fig.update_layout(
         height=350,
@@ -265,51 +327,22 @@ if 'df' in st.session_state:
         paper_bgcolor="#FFF",
         margin=dict(l=20, r=20, t=30, b=20),
         font=dict(family="sans-serif", color="#222"),
-        xaxis=dict(title=None, showgrid=False, zeroline=False),
+        xaxis=dict(
+            title=None,
+            showgrid=False,
+            zeroline=False,
+            tickmode='array',
+            tickvals=todos_los_indices,
+            ticktext=todas_las_etiquetas
+        ),
         yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
+
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Sube primero el archivo de datos reales para ver la gráfica.")
 
-# --- Cálculo de métricas con columnas corregidas ---
-import numpy as np
-
-# Convertimos la fecha correcta
-df['fecha'] = pd.to_datetime(df['orden_pago_aprobado'], errors='coerce')
-df = df.dropna(subset=['fecha'])
-df['trimestre'] = df['fecha'].dt.to_period('Q')
-df['año'] = df['fecha'].dt.year
-df['mes'] = df['fecha'].dt.month
-
-# --- Ingresos Totales ---
-ingresos_totales = df['precio_promedio_por_orden'].sum()
-
-# Variación mensual de ingresos
-mes_actual = df['mes'].max()
-anio_actual = df['año'].max()
-mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
-
-ingresos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-ingresos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-delta_ingresos = ((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100 if ingresos_mes_anterior != 0 else 0
-
-# --- Pedidos Totales ---
-pedidos_totales = df['order_id'].nunique()
-pedidos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['order_id'].nunique()
-pedidos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['order_id'].nunique()
-delta_pedidos = ((pedidos_mes_actual - pedidos_mes_anterior) / pedidos_mes_anterior) * 100 if pedidos_mes_anterior != 0 else 0
-
-# --- Valor Promedio ---
-valor_trimestre_actual = df[df['trimestre'] == df['trimestre'].max()]['precio_promedio_por_orden'].mean()
-valor_trimestre_anterior = df[df['trimestre'] == df['trimestre'].max() - 1]['precio_promedio_por_orden'].mean()
-delta_valor = ((valor_trimestre_actual - valor_trimestre_anterior) / valor_trimestre_anterior) * 100 if valor_trimestre_anterior != 0 else 0
-
-# --- Flete Promedio ---
-flete_actual = df[df['año'] == anio_actual]['costo_de_flete'].mean()
-flete_anterior = df[df['año'] == anio_actual - 1]['costo_de_flete'].mean()
-delta_flete = ((flete_actual - flete_anterior) / flete_anterior) * 100 if flete_anterior != 0 else 0
 
 #Linea divisora
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
