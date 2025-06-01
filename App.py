@@ -1,21 +1,20 @@
-import streamlit as st
+import os
+import sys
+import calendar
+import subprocess
+import numpy as np
 import pandas as pd
+import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-import calendar
-import numpy as np
 
-
-# Paleta de colores
 COLOR_PRIMARY = "#7B3FF2"
 COLOR_ACCENT = "#23C16B"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#F6F6FB"
 
-# Configuración de la página
 st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
-# --- CSS personalizado ---
 st.markdown(f"""
     <style>
     body {{
@@ -78,10 +77,7 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-
-# --- Sidebar ---
 with st.sidebar:
-    # Logo
     try:
         st.image("logo_danu.png", width=180)
     except:
@@ -89,7 +85,6 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # --- FILTROS FUNCIONALES ---
     st.markdown("### Filtros")
     
     if 'df' in st.session_state:
@@ -97,53 +92,41 @@ with st.sidebar:
         df_filtros['orden_pago_aprobado'] = pd.to_datetime(df_filtros['orden_pago_aprobado'], errors='coerce')
         df_filtros = df_filtros.dropna(subset=['orden_pago_aprobado'])
         
-        # Obtener valores únicos para filtros
         regiones = ["Todas las regiones"] + sorted(df_filtros['region'].dropna().unique().tolist())
         categorias = ["Todas las categorías"] + sorted(df_filtros['categoria_simplificada'].dropna().unique().tolist())
     else:
         regiones = ["Todas las regiones"]
         categorias = ["Todas las categorías"]
 
-    # Opciones de período con indicadores de activación
     periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
     periodo_habilitados = ["Último año"]  # solo esta opción está activa
 
-    # Selectbox visible
     periodo_sel = st.selectbox("Periodo", periodo_options)
 
-    # Verificación si seleccionó una opción deshabilitada
     if periodo_sel not in periodo_habilitados:
         st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
         st.stop()
     
-    # FILTRO REGIÓN
     region_sel = st.selectbox("Región", regiones)
     
-    # FILTRO CATEGORÍA
     categoria_sel = st.selectbox("Categoría", categorias)
     
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # --- Recomendaciones funcionales con encabezado arriba ---
-    # Calcular progreso anticipado
     rec_keys = ['rec1', 'rec2', 'rec3']
     rec_defaults = [st.session_state.get(k, False) for k in rec_keys]
     recomendaciones_activadas = sum(rec_defaults)
     progreso_recomendaciones = int((recomendaciones_activadas / 3) * 100)
 
-    # Mostrar título primero
     st.markdown(
         f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY};'>Recomendaciones ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
 
-    # Mostrar checkboxes después
     rec1 = st.checkbox("Optimizar rutas de entrega", value=rec_defaults[0], key='rec1')
     rec2 = st.checkbox("Mejorar gestión de stock", value=rec_defaults[1], key='rec2')
     rec3 = st.checkbox("Ofertas segmentadas", value=rec_defaults[2], key='rec3')
 
-
-# --- Cargar datos primero ---
     uploaded_file = st.file_uploader(
         "Subir base de datos",
         type=["csv", "xlsx", "xls", "txt", "parquet"],
@@ -160,75 +143,78 @@ with st.sidebar:
                 df = pd.read_parquet(uploaded_file)
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python')
+            df.to_excel("df_DataBridgeConsulting.xlsx", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
+
+            resultado = subprocess.run(
+                [sys.executable, "modelo_v1.py"],
+                capture_output=True, text=True
+            )
+            if resultado.returncode != 0:
+                st.error(f"Error en el modelo: {resultado.stderr}")
+
+            if os.path.exists("prediccion_mes_siguiente.csv"):
+                df_pred = pd.read_csv("prediccion_mes_siguiente.csv")
+                df_pred["Tipo"] = "pred"
+                st.success("Predicción mensual generada y cargada.")
+            else:
+                df_pred = pd.DataFrame()
+                st.warning("No se generó predicción para el mes siguiente.")
+
         except Exception as e:
-            st.error(f"Error al cargar el archivo: {str(e)}")
-            
-# --- FUNCIÓN DE FILTRADO PRINCIPAL ---
+            st.error(f"Error general: {str(e)}")
+    else:
+        df_pred = pd.DataFrame()
+
 def aplicar_filtros(df, periodo, region, categoria):
     """Aplica todos los filtros al dataframe"""
     df_filtrado = df.copy()
     
-    # Convertir fechas
     df_filtrado['orden_pago_aprobado'] = pd.to_datetime(df_filtrado['orden_pago_aprobado'], errors='coerce')
     df_filtrado = df_filtrado.dropna(subset=['orden_pago_aprobado'])
     
-    # FILTRO PERÍODO
     if periodo == "Último año":
         fecha_limite = df_filtrado['orden_pago_aprobado'].max() - pd.DateOffset(years=1)
         df_filtrado = df_filtrado[df_filtrado['orden_pago_aprobado'] >= fecha_limite]
     
-    # FILTRO REGIÓN
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
     
-    # FILTRO CATEGORÍA
     if categoria != "Todas las categorías":
         df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
     
     return df_filtrado
 
-# --- APLICAR FILTROS Y CALCULAR KPIS ---
 if 'df' in st.session_state:
-    # Aplicar filtros
     df_filtrado = aplicar_filtros(st.session_state['df'], periodo_sel, region_sel, categoria_sel)
     
     if len(df_filtrado) > 0:
-        # Preparar fechas
         df_filtrado['año'] = df_filtrado['orden_pago_aprobado'].dt.year
         df_filtrado['mes'] = df_filtrado['orden_pago_aprobado'].dt.month
         df_filtrado['trimestre'] = df_filtrado['orden_pago_aprobado'].dt.quarter
         
-        # Obtener períodos para comparaciones
         año_actual = df_filtrado['año'].max()
         mes_actual = df_filtrado['mes'].max()
-        
-        # --- CALCULAR KPIS CON FILTROS APLICADOS ---
-        
-        # 1. INGRESOS TOTALES
+
         ingresos_totales = df_filtrado['precio_final'].sum()
         ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
         ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
         delta_ingresos = ((ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100) if ingresos_año_anterior > 0 else 0
         
-        # 2. PEDIDOS TOTALES
         pedidos_totales = df_filtrado['order_id'].nunique()
         pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
         pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
         delta_pedidos = ((pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100) if pedidos_año_anterior > 0 else 0
         
-        # 3. VALOR PROMEDIO
         valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
         valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
         delta_valor = ((valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100) if valor_promedio_anterior > 0 else 0
         
-        # 4. FLETE PROMEDIO
         flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
         flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
         delta_flete = ((flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100) if flete_promedio_anterior > 0 else 0
         
-        # --- RENDERIZAR TARJETAS CON DATOS FILTRADOS ---
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
@@ -273,73 +259,59 @@ if 'df' in st.session_state:
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-        # --- GRÁFICAS CON DATOS FILTRADOS ---
-        #AQUI ES LA PARTE DE PREDICCION (SI NO FUNCIONA ASEGURATE QUE CUMPLAS CON LOS)
         st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
         
-        # --- GRÁFICAS CON DATOS FILTRADOS ---
         df_filtrado['Mes'] = df_filtrado['orden_pago_aprobado'].dt.month
-        df_mensual = df_filtrado.groupby('Mes')['precio_final'].sum().reset_index()
-        df_mensual['MesIndex'] = df_mensual['Mes']
-        df_mensual['MesNombre'] = df_mensual['Mes'].apply(lambda x: calendar.month_name[x])
+        df_filtrado['Año'] = df_filtrado['orden_pago_aprobado'].dt.year
+        df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
         df_mensual['Tipo'] = "real"
 
-        df_pred = pd.DataFrame()
-        if uploaded_file and "prediccion" in uploaded_file.name.lower():
-            try:
-                pred_df = pd.read_csv(uploaded_file)
-                pred_df['orden_pago_aprobado'] = pd.to_datetime(pred_df['orden_pago_aprobado'], errors='coerce')
-                pred_df = pred_df.dropna(subset=['orden_pago_aprobado'])
+        if not df_pred.empty:
+            df_pred = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
+            df_total = pd.concat([df_mensual, df_pred], ignore_index=True)
+        else:
+            df_total = df_mensual
 
-                # Extraer mes y año
-                pred_df['Mes'] = pred_df['orden_pago_aprobado'].dt.month
-                pred_df['Año'] = pred_df['orden_pago_aprobado'].dt.year
-
-                # Obtener los últimos 3 meses más recientes después de diciembre
-                ult_año = pred_df['Año'].max()
-                pred_df_futuro = pred_df[(pred_df['Año'] == ult_año) & (pred_df['Mes'] > 12 - 3)]
-
-                pred_df_futuro['MesIndex'] = pred_df_futuro['Mes'] + 12  # para que se ubiquen después de diciembre
-                pred_df_futuro['MesNombre'] = pred_df_futuro['Mes'].apply(lambda x: f"{calendar.month_name[x]} {ult_año}")
-                pred_df_futuro['Tipo'] = "pred"
-
-                df_pred = pred_df_futuro.groupby(['MesIndex', 'MesNombre', 'Tipo'])['precio_final'].sum().reset_index()
-
-            except Exception as e:
-                st.warning(f"Error al cargar las predicciones: {e}")
-
-
-        df_total = pd.concat([df_mensual, df_pred], ignore_index=True)
+        df_total = df_total.sort_values(["Año", "Mes"]).reset_index(drop=True)
+        df_total["MesNombre"] = df_total["Mes"].apply(lambda x: calendar.month_name[x])
+        df_total["MesIndex"] = (
+            df_total["Año"].astype(str) + "-" + df_total["Mes"].astype(str).str.zfill(2)
+        )
 
         fig_tendencia = go.Figure()
-
         df_real = df_total[df_total["Tipo"] == "real"]
         fig_tendencia.add_trace(go.Scatter(
             x=df_real["MesIndex"],
             y=df_real["precio_final"],
             mode='lines+markers',
             name='Datos reales',
-            line=dict(color=COLOR_PRIMARY, width=3),
-            marker=dict(size=8, color=COLOR_PRIMARY)
+            line=dict(color="#3B82F6", width=3),
+            marker=dict(size=8, color="#3B82F6")
         ))
+        df_pred_plot = df_total[df_total["Tipo"] == "pred"]
+        if not df_pred_plot.empty:
+            fig_tendencia.add_trace(go.Scatter(
+                x=df_pred_plot["MesIndex"],
+                y=df_pred_plot["precio_final"],
+                mode='lines+markers',
+                name='Predicción mes siguiente',
+                line=dict(color='#AAAAAA', width=2, dash='dot'),
+                marker=dict(size=8, color='#AAAAAA')
+            ))
 
-        df_pred = df_total[df_total["Tipo"] == "pred"]
-        x_pred = [df_real["MesIndex"].iloc[-1]] + df_pred["MesIndex"].tolist()
-        y_pred = [df_real["precio_final"].iloc[-1]] + df_pred["precio_final"].tolist()
-        marker_sizes = [0] + [8] * len(df_pred)
-        marker_colors = ['rgba(0,0,0,0)'] + ['#AAAAAA'] * len(df_pred)
-
-        fig_tendencia.add_trace(go.Scatter(
-            x=x_pred,
-            y=y_pred,
-            mode='lines+markers',
-            name='Predicción',
-            line=dict(color='#AAAAAA', width=2, dash='dot'),
-            marker=dict(size=marker_sizes, color=marker_colors)
-        ))
-
-        labels = df_total["MesNombre"].tolist()
-        ticks = df_total["MesIndex"].tolist()
+            pred_mes = df_pred_plot.iloc[0]
+            fig_tendencia.add_annotation(
+                x=pred_mes["MesIndex"],
+                y=pred_mes["precio_final"],
+                text="Mes Predicho",
+                showarrow=True,
+                arrowhead=1,
+                ax=0,
+                ay=-40,
+                font=dict(color="#AAAAAA", size=12, family="sans-serif"),
+                bgcolor="#FFF",
+                bordercolor="#AAAAAA"
+            )
 
         fig_tendencia.update_layout(
             height=350,
@@ -352,8 +324,8 @@ if 'df' in st.session_state:
                 showgrid=False,
                 zeroline=False,
                 tickmode='array',
-                tickvals=ticks,
-                ticktext=labels
+                tickvals=df_total["MesIndex"],
+                ticktext=[f"{row['MesNombre']} {row['Año']}" for _, row in df_total.iterrows()]
             ),
             yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -361,7 +333,6 @@ if 'df' in st.session_state:
 
         st.plotly_chart(fig_tendencia, use_container_width=True)
         
-        # --- Segunda fila: Gráficas de región y categoría ---
         col5, col6 = st.columns(2)
         
         with col5:
@@ -388,12 +359,11 @@ if 'df' in st.session_state:
         
         with col6:
             st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
-            
-            # Crear datos para bubble chart con datos filtrados
+
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
-                'precio_final': 'mean',  # % Margen (simulado)
-                'dias_entrega': lambda x: (x <= 7).mean() * 100,  # % Entregas a tiempo
-                'order_id': 'count'  # Tamaño de burbuja
+                'precio_final': 'mean',
+                'dias_entrega': lambda x: (x <= 7).mean() * 100,
+                'order_id': 'count'
             }).reset_index()
             
             bubble_data.columns = ['Categoría', '% Margen', '% Entregas a tiempo', 'Tamaño']
@@ -420,10 +390,8 @@ if 'df' in st.session_state:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
 
 else:
-    # Mostrar tarjetas y gráficas vacías si no hay datos cargados
     st.info("Sube tu base de datos para ver las métricas filtradas")
 
-    # Top cards vacías
     col1, col2, col3, col4 = st.columns(4)
     for col, label in zip(
         [col1, col2, col3, col4],
@@ -439,7 +407,6 @@ else:
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Gráfica de tendencia vacía
     st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
     fig_placeholder = px.line(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
     fig_placeholder.update_layout(
@@ -454,7 +421,6 @@ else:
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Gráficas inferiores vacías
     col5, col6 = st.columns(2)
     with col5:
         st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
