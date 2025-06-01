@@ -1,20 +1,29 @@
+import calendar
 import numpy as np
 import pandas as pd
-import calendar
-
-from datetime import datetime, timedelta
-from sklearn.ensemble import RandomForestRegressor
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 
-df = pd.read_excel("df_DataBridgeConsulting.xlsx")
+from xgboost import XGBRegressor
+from datetime import datetime, timedelta
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+
+try:
+    df = pd.read_excel("df_DataBridgeConsulting.xlsx")
+except Exception as e:
+    print("Error:", e)
 df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'])
 df['fecha'] = df['orden_compra_timestamp'].dt.normalize()
 
 df_diario = df.groupby('fecha')['precio_final'].sum().reset_index()
 df_diario.columns = ['ds', 'y']
 df_diario['ds'] = pd.to_datetime(df_diario['ds'])
+
+media = df_diario['y'].mean()
+std = df_diario['y'].std()
+z_score = (df_diario['y'] - media) / std
+outliers = np.abs(z_score) > 3
+df_diario.loc[outliers, 'y'] = df_diario['y'].rolling(7, min_periods=1, center=True).mean()[outliers]
 
 np.random.seed(42)
 df_diario['tipo_cambio'] = 18.0 + np.cumsum(np.random.normal(0, 0.02, len(df_diario)))
@@ -40,6 +49,11 @@ def crear_features_temporales_mejoradas(df_diario):
         df[f'lag_{i}'] = df['y'].shift(i)
     df['dia_semana'] = df['ds'].dt.dayofweek
     df['dia_mes'] = df['ds'].dt.day
+    df['mes'] = df['ds'].dt.month
+    df['mes_sin'] = np.sin(2 * np.pi * df['mes'] / 12)
+    df['mes_cos'] = np.cos(2 * np.pi * df['mes'] / 12)
+    df['dia_semana_sin'] = np.sin(2 * np.pi * df['dia_semana'] / 7)
+    df['dia_semana_cos'] = np.cos(2 * np.pi * df['dia_semana'] / 7)
     df['semana_mes'] = (df['ds'].dt.day - 1) // 7 + 1
     df['trimestre'] = df['ds'].dt.quarter
     df['año'] = df['ds'].dt.year
@@ -117,7 +131,7 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
     lags = ultimos_datos.copy()
     ultimo_dia_conocido = df_diario['ds'].max()
     ingresos_mensuales = []
-    for i in range(3, 0, -1):
+    for i in range(4, 0, -1):
         fecha = ultimo_dia_conocido - pd.DateOffset(months=i)
         primer_dia_mes = fecha.replace(day=1)
         ultimo_dia_mes = fecha.replace(day=calendar.monthrange(fecha.year, fecha.month)[1])
@@ -137,11 +151,16 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
     else:
         factor_ajuste = min(1.3, max(factor_ajuste, 1))
         tendencia_txt = "↑ SUBIDA"
-    print(f"\n📉 Tendencia detectada en últimos 3 meses: {tendencia_txt}")
-    print(f"📈 Factor de ajuste aplicado: {factor_ajuste:.2f}x")
+    print(f"\nTendencia detectada en últimos 4 meses: {tendencia_txt}")
+    print(f"Factor de ajuste aplicado: {factor_ajuste:.2f}x")
     for fecha_pred in fechas_pred:
         dia_semana = fecha_pred.dayofweek
         dia_mes = fecha_pred.day
+        mes = fecha_pred.month
+        mes_sin = np.sin(2 * np.pi * mes / 12)
+        mes_cos = np.cos(2 * np.pi * mes / 12)
+        dia_semana_sin = np.sin(2 * np.pi * dia_semana / 7)
+        dia_semana_cos = np.cos(2 * np.pi * dia_semana / 7)
         semana_mes = (dia_mes - 1) // 7 + 1
         trimestre = ((fecha_pred.month - 1) // 3) + 1
         año = fecha_pred.year
@@ -164,11 +183,12 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
             (fecha_pred >= datetime(2018, 5, 28) and fecha_pred <= datetime(2018, 6, 1)) or
             (fecha_pred >= datetime(2018, 11, 16) and fecha_pred <= datetime(2018, 11, 19))
         ) else 0
+
         features = (
             lags[-21:] +
-            [dia_semana, dia_mes, semana_mes, trimestre, año,
-             media_movil_7, media_movil_15, tendencia_lineal, tendencia_cuadratica,
-             festivo, quincena, tipo_cambio, inflacion_mensual, evento_especial]
+            [dia_semana, dia_mes, mes, mes_sin, mes_cos, dia_semana_sin, dia_semana_cos, semana_mes, trimestre, año,
+            media_movil_7, media_movil_15, tendencia_lineal, tendencia_cuadratica,
+            festivo, quincena, tipo_cambio, inflacion_mensual, evento_especial]
         )
         features_df = pd.DataFrame([features], columns=feature_names)
         pred_rf = modelos[0].predict(features_df)[0]
@@ -183,41 +203,57 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
 
 ultima_fecha = df_temporal['ds'].max()
 primer_dia_ultimo_mes = ultima_fecha.replace(day=1)
-train_final = df_temporal[df_temporal['ds'] < primer_dia_ultimo_mes]
+train_final = df_temporal.copy()
 X_train_final = train_final.drop(['ds', 'y'], axis=1)
 y_train_final = train_final['y']
+feature_names = X_train_final.columns
+
 rf_final = RandomForestRegressor(n_estimators=500, max_depth=15, min_samples_split=2, max_features='sqrt', random_state=42)
-xgb_final = XGBRegressor(n_estimators=500, max_depth=6, learning_rate=0.1, random_state=42)
 rf_final.fit(X_train_final, y_train_final)
+xgb_final = XGBRegressor(n_estimators=500, max_depth=6, learning_rate=0.1, random_state=42)
 xgb_final.fit(X_train_final, y_train_final)
 
 ultimo_dia = df_diario['ds'].max()
-if ultimo_dia.month == 12:
-    mes_siguiente = 1
-    año_siguiente = ultimo_dia.year + 1
-else:
-    mes_siguiente = ultimo_dia.month + 1
-    año_siguiente = ultimo_dia.year
-primer_dia_mes_siguiente = datetime(año_siguiente, mes_siguiente, 1)
-ultimo_dia_mes_siguiente = datetime(
-    año_siguiente, mes_siguiente, calendar.monthrange(año_siguiente, mes_siguiente)[1]
-)
-fechas_pred = pd.date_range(primer_dia_mes_siguiente, ultimo_dia_mes_siguiente, freq='D')
+
+fechas_pred_todos = []
+for i in range(1, 4):
+    if ultimo_dia.month + i > 12:
+        mes = (ultimo_dia.month + i) % 12
+        anio = ultimo_dia.year + ((ultimo_dia.month + i - 1) // 12)
+    else:
+        mes = ultimo_dia.month + i
+        anio = ultimo_dia.year
+    primer_dia = datetime(anio, mes, 1)
+    ultimo_dia_mes = datetime(anio, mes, calendar.monthrange(anio, mes)[1])
+    fechas_pred_todos.extend(list(pd.date_range(primer_dia, ultimo_dia_mes, freq='D')))
 
 ultimos_lags = df_temporal['y'].values[-21:].tolist()
-feature_names = X_train_final.columns
+predicciones_todas = []
 
-predicciones = predecir_mes_con_tendencia_ensemble(
-    [rf_final, xgb_final],
-    ultimos_lags,
-    feature_names,
-    fechas_pred,
-    df_diario
-)
+for i in range(3):
+    if ultimo_dia.month + i + 1 > 12:
+        mes = (ultimo_dia.month + i + 1) % 12
+        anio = ultimo_dia.year + ((ultimo_dia.month + i) // 12)
+    else:
+        mes = ultimo_dia.month + i + 1
+        anio = ultimo_dia.year
+    primer_dia = datetime(anio, mes, 1)
+    ultimo_dia_mes = datetime(anio, mes, calendar.monthrange(anio, mes)[1])
+    fechas_pred = pd.date_range(primer_dia, ultimo_dia_mes, freq='D')
+    
+    predicciones = predecir_mes_con_tendencia_ensemble(
+        [rf_final, xgb_final],
+        ultimos_lags,
+        feature_names,
+        fechas_pred,
+        df_diario
+    )
+    predicciones_todas.extend(predicciones)
+    ultimos_lags.extend(predicciones)
 
 resultados = pd.DataFrame({
-    'Fecha': fechas_pred.date,
-    'Predicción': predicciones
+    'Fecha': [f.date() for f in fechas_pred_todos],
+    'Predicción': predicciones_todas
 })
 
 print("\n🔮 Predicción para el mes siguiente COMPLETO:")
@@ -235,26 +271,26 @@ precision = None
 if total_historico > 0:
     precision = (1 - abs(total_predicho - total_historico) / total_historico) * 100
 
-print("\n📊 Histórico año anterior:")
+print("\nHistórico año anterior:")
 if not historico_mes_anterior.empty:
     print(historico_mes_anterior.rename(columns={'ds':'Fecha', 'y':'Real'}).round(2).to_string(index=False))
 else:
     print("No hay datos históricos para comparar.")
 
-print(f"\n📈 Total predicho: ${total_predicho:,.2f}")
-print(f"\n📉 Total histórico: ${total_historico:,.2f}")
-print(f"\n🔀 Tendencia: {tendencia}")
+print(f"\nTotal predicho: ${total_predicho:,.2f}")
+print(f"\nTotal histórico: ${total_historico:,.2f}")
+print(f"\nTendencia: {tendencia}")
 
 if precision is not None:
-    print(f"\n🎯 Precisión de la predicción: {precision:.2f}%")
+    print(f"\nPrecisión de la predicción: {precision:.2f}%")
 else:
-    print("\n⚠️ No se pudo calcular la precisión (falta histórico).")
+    print("\nNo se pudo calcular la precisión (falta histórico).")
 
-# ultimo_real = df_diario[['ds', 'y']].iloc[-1]
-# prediccion_conectada = pd.concat([
-#     pd.DataFrame({'Fecha': [ultimo_real['ds'].date()], 'Predicción': [ultimo_real['y']]}),
-#     resultados
-# ], ignore_index=True)
+ultimo_real = df_diario[['ds', 'y']].iloc[-1]
+prediccion_conectada = pd.concat([
+    pd.DataFrame({'Fecha': [ultimo_real['ds'].date()], 'Predicción': [ultimo_real['y']]}),
+    resultados
+], ignore_index=True)
 
 # plt.figure(figsize=(14,6))
 # plt.plot(df_diario['ds'], df_diario['y'], label='Histórico real')
