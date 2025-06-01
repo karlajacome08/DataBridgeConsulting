@@ -109,22 +109,22 @@ def walk_forward_validation_ensemble(df_temporal, n_months_val=3):
         scores.append(r2_score(y_val, y_pred))
         maes.append(mean_absolute_error(y_val, y_pred))
         rmses.append(np.sqrt(mean_squared_error(y_val, y_pred)))
-    # print(f"\nR² promedio walk-forward ensemble: {np.mean(scores):.3f}")
-    # print(f"MAE promedio walk-forward ensemble: {np.mean(maes):.2f}")
-    # print(f"RMSE promedio walk-forward ensemble: {np.mean(rmses):.2f}")
+    print(f"\nR² promedio walk-forward ensemble: {np.mean(scores):.3f}")
+    print(f"MAE promedio walk-forward ensemble: {np.mean(maes):.2f}")
+    print(f"RMSE promedio walk-forward ensemble: {np.mean(rmses):.2f}")
     return fechas, trues, preds
 
-fechas, y_true, y_pred = walk_forward_validation_ensemble(df_temporal, n_months_val=3)
+fechas, y_true, y_pred = walk_forward_validation_ensemble(df_temporal, n_months_val=2)
 
-# plt.figure(figsize=(14,6))
-# plt.plot(fechas, y_true, label='Real')
-# plt.plot(fechas, y_pred, label='Predicción Ensemble', color='orange')
-# plt.title('Validación walk-forward (Ensemble): Real vs Predicción')
-# plt.xlabel('Fecha')
-# plt.ylabel('Ventas diarias')
-# plt.legend()
-# plt.tight_layout()
-# plt.show()
+plt.figure(figsize=(14,6))
+plt.plot(fechas, y_true, label='Real')
+plt.plot(fechas, y_pred, label='Predicción Ensemble', color='orange')
+plt.title('Validación walk-forward (Ensemble): Real vs Predicción')
+plt.xlabel('Fecha')
+plt.ylabel('Ventas diarias')
+plt.legend()
+plt.tight_layout()
+plt.show()
 
 def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, fechas_pred, df_diario):
     predicciones = []
@@ -216,7 +216,7 @@ xgb_final.fit(X_train_final, y_train_final)
 ultimo_dia = df_diario['ds'].max()
 
 fechas_pred_todos = []
-for i in range(1, 4):
+for i in range(1, 3):
     if ultimo_dia.month + i > 12:
         mes = (ultimo_dia.month + i) % 12
         anio = ultimo_dia.year + ((ultimo_dia.month + i - 1) // 12)
@@ -230,7 +230,7 @@ for i in range(1, 4):
 ultimos_lags = df_temporal['y'].values[-21:].tolist()
 predicciones_todas = []
 
-for i in range(3):
+for i in range(2):
     if ultimo_dia.month + i + 1 > 12:
         mes = (ultimo_dia.month + i + 1) % 12
         anio = ultimo_dia.year + ((ultimo_dia.month + i) // 12)
@@ -256,7 +256,7 @@ resultados = pd.DataFrame({
     'Predicción': predicciones_todas
 })
 
-print("\n🔮 Predicción para el mes siguiente COMPLETO:")
+print("\nPredicción para el mes siguiente COMPLETO:")
 print(resultados.round(2).to_string(index=False))
 
 resultados['año_anterior'] = resultados['Fecha'].apply(lambda x: x.replace(year=x.year-1))
@@ -292,16 +292,16 @@ prediccion_conectada = pd.concat([
     resultados
 ], ignore_index=True)
 
-# plt.figure(figsize=(14,6))
-# plt.plot(df_diario['ds'], df_diario['y'], label='Histórico real')
-# plt.plot(prediccion_conectada['Fecha'], prediccion_conectada['Predicción'], label='Predicción mes siguiente (Ensemble)', color='orange')
-# plt.axvline(resultados['Fecha'].iloc[0], color='red', linestyle='--', label='Inicio predicción')
-# plt.legend()
-# plt.title('Ventas diarias: Real vs Predicción (Ensemble)')
-# plt.xlabel('Fecha')
-# plt.ylabel('Ventas')
-# plt.tight_layout()
-# plt.show()
+plt.figure(figsize=(14,6))
+plt.plot(df_diario['ds'], df_diario['y'], label='Histórico real')
+plt.plot(prediccion_conectada['Fecha'], prediccion_conectada['Predicción'], label='Predicción mes siguiente (Ensemble)', color='orange')
+plt.axvline(resultados['Fecha'].iloc[0], color='red', linestyle='--', label='Inicio predicción')
+plt.legend()
+plt.title('Ventas diarias: Real vs Predicción (Ensemble)')
+plt.xlabel('Fecha')
+plt.ylabel('Ventas')
+plt.tight_layout()
+plt.show()
 
 resultados_mes = resultados.copy()
 resultados_mes["Mes"] = pd.to_datetime(resultados_mes["Fecha"]).dt.month
