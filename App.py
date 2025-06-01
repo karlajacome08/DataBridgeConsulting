@@ -82,6 +82,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+
+
 # --- Sidebar ---
 with st.sidebar:
 
@@ -110,13 +113,11 @@ with st.sidebar:
     categoria_sel = st.selectbox("Categoría", ["Todas las categorías"] + categorias)
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # Recomendaciones (NO BORRADO)
+    # Recomendaciones (las capturamos en variables rec1, rec2, rec3)
     st.markdown(f"### <span style='color:{COLOR_PRIMARY};'>Recomendaciones</span>", unsafe_allow_html=True)
-    st.checkbox("Optimizar rutas de entrega\nReducir tiempos en zona Este")
-    st.checkbox("Aumentar capacidad logística\nAlmacenamiento en Barcelona")
-    st.checkbox("Promocionar Electrónica\nMayor margen de beneficio")
-    st.checkbox("Revisar proveedores\nReducir costos de envío")
-    st.checkbox("Implementar seguimiento GPS\nPara entregas en tiempo real")
+    rec1 = st.checkbox("Recomendación 1")
+    rec2 = st.checkbox("Recomendación 2")
+    rec3 = st.checkbox("Recomendación 3")
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
     # Botón para subir base de datos (AL FINAL)
@@ -242,7 +243,7 @@ if 'df' in st.session_state:
     meses_futuros_nombres = [calendar.month_name[m] for m in meses_futuros]     
 
     #Valores (dummies) de prediccion
-    pred1 = 4890000   
+    pred1 = 489000
     pred2 = 570000   
     pred3 = 520600   
     valores_dummie = [pred1, pred2, pred3]
@@ -269,24 +270,52 @@ if 'df' in st.session_state:
     ultimo_indice = ingresos_reales['MesIndex'].iloc[-1]      
     ultimo_valor = ingresos_reales['precio_final'].iloc[-1]   
 
-    # Construir la secuencia X e Y para la línea dummy:
-    x_dummy = [ultimo_indice] + df_dummie['MesIndex'].tolist()           
-    y_dummy = [ultimo_valor] + df_dummie['precio_final'].tolist()         
+    # Coordenadas de cada segmento:
+    seg_x = [
+        [ultimo_indice, df_dummie['MesIndex'].iloc[0]],        # Segmento 1
+        [df_dummie['MesIndex'].iloc[0], df_dummie['MesIndex'].iloc[1]],  # Segmento 2
+        [df_dummie['MesIndex'].iloc[1], df_dummie['MesIndex'].iloc[2]]   # Segmento 3
+    ]
+    seg_y = [
+        [ultimo_valor, df_dummie['precio_final'].iloc[0]],
+        [df_dummie['precio_final'].iloc[0], df_dummie['precio_final'].iloc[1]],
+        [df_dummie['precio_final'].iloc[1], df_dummie['precio_final'].iloc[2]]
+    ]
 
-    # Ocultar el marcador en el primer punto (último real) usando lista de tamaños:
-    marker_sizes = [0] + [8] * len(df_dummie)   
-    marker_colors = ['rgba(0,0,0,0)'] + ['#AAAAAA'] * len(df_dummie)
+    # Predicciones en gris
+    for i in range(3):
+        fig.add_trace(go.Scatter(
+            x=seg_x[i],
+            y=seg_y[i],
+            mode='lines+markers',
+            name=f"Segmento {i+1} (gris)",
+            line=dict(color="#DDDDDD", width=2, dash='dot'),
+            marker=dict(
+                size=[0, 8],            
+                color=['rgba(0,0,0,0)', "#DDDDDD"]
+            ),
+            showlegend=False
+        ))
 
-    fig.add_trace(go.Scatter(
-        x=x_dummy,
-        y=y_dummy,
-        mode='lines+markers',
-        name='Predicción (dummie)',
-        line=dict(color='#AAAAAA', width=2, dash='dot'),
-        marker=dict(size=marker_sizes, color=marker_colors)
-    ))
+    #Marcar las predicciones en el grafico segun las recomendaciones
+    n_checked = sum([rec1, rec2, rec3])  # 0, 1, 2 o 3
 
-    #Subir archivo de prediccion
+   
+    for i in range(n_checked):
+        fig.add_trace(go.Scatter(
+            x=seg_x[i],
+            y=seg_y[i],
+            mode='lines+markers',
+            name=f"Segmento {i+1} (activo)",
+            line=dict(color=COLOR_ACCENT, width=2, dash='solid'),
+            marker=dict(
+                size=[0, 8],  
+                color=['rgba(0,0,0,0)', COLOR_ACCENT]
+            ),
+            showlegend=False
+        ))
+
+    #Subir archivo para predicciones
     pred_file = st.file_uploader("Sube archivo de predicción mensual", type=["csv", "xlsx"])
     if pred_file:
         try:
@@ -312,13 +341,13 @@ if 'df' in st.session_state:
         except Exception as e:
             st.error(f"Error al leer archivo de predicción: {e}")
 
-    #Configurar con las etiquetas repetidas
-    idx_reales = ingresos_reales['MesIndex'].tolist()         
-    idx_dummie = df_dummie['MesIndex'].tolist()               
+    #Mostrar meses siguientes
+    idx_reales = ingresos_reales['MesIndex'].tolist()
+    idx_dummie = df_dummie['MesIndex'].tolist()
     todos_los_indices = idx_reales + idx_dummie
 
-    labels_reales = ingresos_reales['MesNombre'].tolist()    
-    labels_dummie = df_dummie['MesNombre'].tolist()          
+    labels_reales = ingresos_reales['MesNombre'].tolist()
+    labels_dummie = df_dummie['MesNombre'].tolist()
     todas_las_etiquetas = labels_reales + labels_dummie
 
     fig.update_layout(
@@ -342,6 +371,8 @@ if 'df' in st.session_state:
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("Sube primero el archivo de datos reales para ver la gráfica.")
+
+    
 
 
 #Linea divisora
