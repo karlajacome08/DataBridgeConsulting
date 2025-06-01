@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import calendar
+import numpy as np
+
 
 # Paleta de colores
 COLOR_PRIMARY = "#7B3FF2"
@@ -83,7 +85,7 @@ with st.sidebar:
     try:
         st.image("logo_danu.png", width=180)
     except:
-        st.markdown("*DANU ANALÍTICA*")
+        st.markdown("DANU ANALÍTICA")
 
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
@@ -106,10 +108,10 @@ with st.sidebar:
     periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
     periodo_habilitados = ["Último año"]  # solo esta opción está activa
 
-# Selectbox visible
+    # Selectbox visible
     periodo_sel = st.selectbox("Periodo", periodo_options)
 
-# Verificación si seleccionó una opción deshabilitada
+    # Verificación si seleccionó una opción deshabilitada
     if periodo_sel not in periodo_habilitados:
         st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
         st.stop()
@@ -122,13 +124,24 @@ with st.sidebar:
     
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # Recomendaciones
-    st.markdown(f"### <span style='color:{COLOR_PRIMARY};'>Recomendaciones</span>", unsafe_allow_html=True)
-    st.checkbox("Optimizar rutas de entrega\nReducir tiempos en zona Este")
-    st.checkbox("Aumentar capacidad logística\nAlmacenamiento en Barcelona")
-    st.checkbox("Promocionar Electrónica\nMayor margen de beneficio")
-    st.checkbox("Revisar proveedores\nReducir costos de envío")
-    st.checkbox("Implementar seguimiento GPS\nPara entregas en tiempo real")
+    # --- Recomendaciones funcionales con encabezado arriba ---
+    # Calcular progreso anticipado
+    rec_keys = ['rec1', 'rec2', 'rec3']
+    rec_defaults = [st.session_state.get(k, False) for k in rec_keys]
+    recomendaciones_activadas = sum(rec_defaults)
+    progreso_recomendaciones = int((recomendaciones_activadas / 3) * 100)
+
+    # Mostrar título primero
+    st.markdown(
+        f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY};'>Recomendaciones ({progreso_recomendaciones}%)</h4>",
+        unsafe_allow_html=True
+    )
+
+    # Mostrar checkboxes después
+    rec1 = st.checkbox("Optimizar rutas de entrega", value=rec_defaults[0], key='rec1')
+    rec2 = st.checkbox("Mejorar gestión de stock", value=rec_defaults[1], key='rec2')
+    rec3 = st.checkbox("Ofertas segmentadas", value=rec_defaults[2], key='rec3')
+
 
 # --- Cargar datos primero ---
     uploaded_file = st.file_uploader(
@@ -261,30 +274,93 @@ if 'df' in st.session_state:
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
         # --- GRÁFICAS CON DATOS FILTRADOS ---
-        
-        # Gráfica de tendencia mensual
+        #AQUI ES LA PARTE DE PREDICCION (SI NO FUNCIONA ASEGURATE QUE CUMPLAS CON LOS)
         st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
-        df_mensual = df_filtrado.groupby(df_filtrado['orden_pago_aprobado'].dt.to_period('M'))['precio_final'].sum().reset_index()
-        df_mensual['orden_pago_aprobado'] = df_mensual['orden_pago_aprobado'].astype(str)
         
-        fig_tendencia = px.line(df_mensual, x='orden_pago_aprobado', y='precio_final', markers=True)
-        fig_tendencia.update_traces(
+        # --- GRÁFICAS CON DATOS FILTRADOS ---
+        df_filtrado['Mes'] = df_filtrado['orden_pago_aprobado'].dt.month
+        df_mensual = df_filtrado.groupby('Mes')['precio_final'].sum().reset_index()
+        df_mensual['MesIndex'] = df_mensual['Mes']
+        df_mensual['MesNombre'] = df_mensual['Mes'].apply(lambda x: calendar.month_name[x])
+        df_mensual['Tipo'] = "real"
+
+        df_pred = pd.DataFrame()
+        if uploaded_file and "prediccion" in uploaded_file.name.lower():
+            try:
+                pred_df = pd.read_csv(uploaded_file)
+                pred_df['orden_pago_aprobado'] = pd.to_datetime(pred_df['orden_pago_aprobado'], errors='coerce')
+                pred_df = pred_df.dropna(subset=['orden_pago_aprobado'])
+
+                # Extraer mes y año
+                pred_df['Mes'] = pred_df['orden_pago_aprobado'].dt.month
+                pred_df['Año'] = pred_df['orden_pago_aprobado'].dt.year
+
+                # Obtener los últimos 3 meses más recientes después de diciembre
+                ult_año = pred_df['Año'].max()
+                pred_df_futuro = pred_df[(pred_df['Año'] == ult_año) & (pred_df['Mes'] > 12 - 3)]
+
+                pred_df_futuro['MesIndex'] = pred_df_futuro['Mes'] + 12  # para que se ubiquen después de diciembre
+                pred_df_futuro['MesNombre'] = pred_df_futuro['Mes'].apply(lambda x: f"{calendar.month_name[x]} {ult_año}")
+                pred_df_futuro['Tipo'] = "pred"
+
+                df_pred = pred_df_futuro.groupby(['MesIndex', 'MesNombre', 'Tipo'])['precio_final'].sum().reset_index()
+
+            except Exception as e:
+                st.warning(f"Error al cargar las predicciones: {e}")
+
+
+        df_total = pd.concat([df_mensual, df_pred], ignore_index=True)
+
+        fig_tendencia = go.Figure()
+
+        df_real = df_total[df_total["Tipo"] == "real"]
+        fig_tendencia.add_trace(go.Scatter(
+            x=df_real["MesIndex"],
+            y=df_real["precio_final"],
+            mode='lines+markers',
+            name='Datos reales',
             line=dict(color=COLOR_PRIMARY, width=3),
             marker=dict(size=8, color=COLOR_PRIMARY)
-        )
+        ))
+
+        df_pred = df_total[df_total["Tipo"] == "pred"]
+        x_pred = [df_real["MesIndex"].iloc[-1]] + df_pred["MesIndex"].tolist()
+        y_pred = [df_real["precio_final"].iloc[-1]] + df_pred["precio_final"].tolist()
+        marker_sizes = [0] + [8] * len(df_pred)
+        marker_colors = ['rgba(0,0,0,0)'] + ['#AAAAAA'] * len(df_pred)
+
+        fig_tendencia.add_trace(go.Scatter(
+            x=x_pred,
+            y=y_pred,
+            mode='lines+markers',
+            name='Predicción',
+            line=dict(color='#AAAAAA', width=2, dash='dot'),
+            marker=dict(size=marker_sizes, color=marker_colors)
+        ))
+
+        labels = df_total["MesNombre"].tolist()
+        ticks = df_total["MesIndex"].tolist()
+
         fig_tendencia.update_layout(
             height=350,
             plot_bgcolor="#FFF",
             paper_bgcolor="#FFF",
             margin=dict(l=20, r=20, t=30, b=20),
-            xaxis=dict(title=None, showgrid=False),
+            font=dict(family="sans-serif", color="#222"),
+            xaxis=dict(
+                title=None,
+                showgrid=False,
+                zeroline=False,
+                tickmode='array',
+                tickvals=ticks,
+                ticktext=labels
+            ),
             yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
-            showlegend=False
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
+
         st.plotly_chart(fig_tendencia, use_container_width=True)
-
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
+        
         # --- Segunda fila: Gráficas de región y categoría ---
         col5, col6 = st.columns(2)
         
