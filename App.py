@@ -69,57 +69,68 @@ st.markdown(f"""
         border-bottom: 1.5px solid #ECEAF6;
         margin: 16px 0 16px 0;
     }}
+    .disabled-option {{
+        color: #CCCCCC !important;
+        background-color: #F5F5F5 !important;
+    }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- Título principal centrado en la parte blanca ---
-st.markdown(
-    """
-    <h1 style='text-align:center; margin-bottom: 0.5rem;'>
-        Panel de Entregas 🚚
-    </h1>
-    """,
-    unsafe_allow_html=True
-)
 
 # --- Sidebar ---
 with st.sidebar:
-
     # Logo
-    st.image("logo_danu.png", width=180)
+    try:
+        st.image("logo_danu.png", width=180)
+    except:
+        st.markdown("*DANU ANALÍTICA*")
 
-    if 'df' in st.session_state:
-        df_sidebar = st.session_state['df'].copy()
-        df_sidebar['orden_pago_aprobado'] = pd.to_datetime(df_sidebar['orden_pago_aprobado'], errors='coerce')
-        df_sidebar = df_sidebar.dropna(subset=['orden_pago_aprobado'])
-
-        # Crear columna Año-Mes para filtrar
-        df_sidebar['Periodo'] = df_sidebar['orden_pago_aprobado'].dt.to_period("M").astype(str)
-        periodos = sorted(df_sidebar['Periodo'].unique(), reverse=True)
-        regiones = sorted(df_sidebar['region'].dropna().unique())
-        categorias = sorted(df_sidebar['categoria_simplificada'].dropna().unique())
-    else:
-        periodos = []
-        regiones = []
-        categorias = []
-
-    # Filtros dinámicos
-    st.markdown("### Filtros")
-    periodo_sel = st.selectbox("Periodo", ["Todos los periodos"] + periodos)
-    region_sel = st.selectbox("Región", ["Todas las regiones"] + regiones)
-    categoria_sel = st.selectbox("Categoría", ["Todas las categorías"] + categorias)
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # Recomendaciones (NO BORRADO)
+    # --- FILTROS FUNCIONALES ---
+    st.markdown("### Filtros")
+    
+    if 'df' in st.session_state:
+        df_filtros = st.session_state['df'].copy()
+        df_filtros['orden_pago_aprobado'] = pd.to_datetime(df_filtros['orden_pago_aprobado'], errors='coerce')
+        df_filtros = df_filtros.dropna(subset=['orden_pago_aprobado'])
+        
+        # Obtener valores únicos para filtros
+        regiones = ["Todas las regiones"] + sorted(df_filtros['region'].dropna().unique().tolist())
+        categorias = ["Todas las categorías"] + sorted(df_filtros['categoria_simplificada'].dropna().unique().tolist())
+    else:
+        regiones = ["Todas las regiones"]
+        categorias = ["Todas las categorías"]
+
+    # Opciones de período con indicadores de activación
+    periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
+    periodo_habilitados = ["Último año"]  # solo esta opción está activa
+
+# Selectbox visible
+    periodo_sel = st.selectbox("Periodo", periodo_options)
+
+# Verificación si seleccionó una opción deshabilitada
+    if periodo_sel not in periodo_habilitados:
+        st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
+        st.stop()
+    
+    # FILTRO REGIÓN
+    region_sel = st.selectbox("Región", regiones)
+    
+    # FILTRO CATEGORÍA
+    categoria_sel = st.selectbox("Categoría", categorias)
+    
+    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
+
+    # Recomendaciones
     st.markdown(f"### <span style='color:{COLOR_PRIMARY};'>Recomendaciones</span>", unsafe_allow_html=True)
     st.checkbox("Optimizar rutas de entrega\nReducir tiempos en zona Este")
     st.checkbox("Aumentar capacidad logística\nAlmacenamiento en Barcelona")
     st.checkbox("Promocionar Electrónica\nMayor margen de beneficio")
     st.checkbox("Revisar proveedores\nReducir costos de envío")
     st.checkbox("Implementar seguimiento GPS\nPara entregas en tiempo real")
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
-    # Botón para subir base de datos (AL FINAL)
+# --- Cargar datos primero ---
     uploaded_file = st.file_uploader(
         "Subir base de datos",
         type=["csv", "xlsx", "xls", "txt", "parquet"],
@@ -137,235 +148,253 @@ with st.sidebar:
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python')
             st.session_state['df'] = df
-            with st.expander("Vista previa de los datos cargados"):
-                st.dataframe(df.head(10), height=300)
             st.success("¡Archivo cargado exitosamente!")
         except Exception as e:
             st.error(f"Error al cargar el archivo: {str(e)}")
-
-# --- Procesamiento y KPIs dinámicas ---
-if 'df' in st.session_state:
-    df = st.session_state['df'].copy()
-    df['fecha'] = pd.to_datetime(df['orden_pago_aprobado'], errors='coerce')
-    df = df.dropna(subset=['fecha'])
-    df['trimestre'] = df['fecha'].dt.to_period('Q')
-    df['año'] = df['fecha'].dt.year
-    df['mes'] = df['fecha'].dt.month
-
-    # Ingresos Totales
-    ingresos_totales = df['precio_promedio_por_orden'].sum()
-    mes_actual = df['mes'].max()
-    anio_actual = df['año'].max()
-    mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
-    ingresos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-    ingresos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-    delta_ingresos = ((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100 if ingresos_mes_anterior != 0 else 0
-
-    # Pedidos Totales
-    pedidos_totales = df['order_id'].nunique()
-    pedidos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['order_id'].nunique()
-    pedidos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['order_id'].nunique()
-    delta_pedidos = ((pedidos_mes_actual - pedidos_mes_anterior) / pedidos_mes_anterior) * 100 if pedidos_mes_anterior != 0 else 0
-
-    # Valor Promedio
-    valor_trimestre_actual = df[df['trimestre'] == df['trimestre'].max()]['precio_promedio_por_orden'].mean()
-    valor_trimestre_anterior = df[df['trimestre'] == df['trimestre'].max() - 1]['precio_promedio_por_orden'].mean()
-    delta_valor = ((valor_trimestre_actual - valor_trimestre_anterior) / valor_trimestre_anterior) * 100 if valor_trimestre_anterior != 0 else 0
-
-    # Flete Promedio
-    flete_actual = df[df['año'] == anio_actual]['costo_de_flete'].mean()
-    flete_anterior = df[df['año'] == anio_actual - 1]['costo_de_flete'].mean()
-    delta_flete = ((flete_actual - flete_anterior) / flete_anterior) * 100 if flete_anterior != 0 else 0
-
-    # Renderizar tarjetas
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(
-            f"""<div class="kpi-card">
-                    <div class="kpi-label">Ingresos Totales</div>
-                    <div class="kpi-value">${ingresos_totales:,.0f}</div>
-                    <div class="kpi-delta-pos">{delta_ingresos:+.1f}% ↑</div>
-                    <div class="kpi-subtext">vs mes anterior</div>
-                </div>""", unsafe_allow_html=True)
-    with col2:
-        st.markdown(
-            f"""<div class="kpi-card">
-                    <div class="kpi-label">Pedidos Totales</div>
-                    <div class="kpi-value">{pedidos_totales:,}</div>
-                    <div class="kpi-delta-pos">{delta_pedidos:+.1f}% ↑</div>
-                    <div class="kpi-subtext">vs mes anterior</div>
-                </div>""", unsafe_allow_html=True)
-    with col3:
-        st.markdown(
-            f"""<div class="kpi-card">
-                    <div class="kpi-label">Valor Promedio</div>
-                    <div class="kpi-value">${valor_trimestre_actual:,.2f}</div>
-                    <div class="kpi-delta-neg">{delta_valor:+.1f}% ↓</div>
-                    <div class="kpi-subtext">vs trimestre anterior</div>
-                </div>""", unsafe_allow_html=True)
-    with col4:
-        st.markdown(
-            f"""<div class="kpi-card">
-                    <div class="kpi-label">Flete Promedio</div>
-                    <div class="kpi-value">${flete_actual:,.2f}</div>
-                    <div class="kpi-delta-pos">{delta_flete:+.1f}% ↑</div>
-                    <div class="kpi-subtext">vs año anterior</div>
-                </div>""", unsafe_allow_html=True)
-else:
-    st.info("Sube primero la base de datos para ver las métricas.")
-
-
-# --- Gráfica de tendencia de ingresos con predicción CONTINUA ---
-if 'df' in st.session_state:
-    df_real = st.session_state['df'].copy()
+            
+# --- FUNCIÓN DE FILTRADO PRINCIPAL ---
+def aplicar_filtros(df, periodo, region, categoria):
+    """Aplica todos los filtros al dataframe"""
+    df_filtrado = df.copy()
     
-    # Convertir a fecha y extraer mes
-    df_real['orden_pago_aprobado'] = pd.to_datetime(df_real['orden_pago_aprobado'], errors='coerce')
-    df_real = df_real.dropna(subset=['orden_pago_aprobado', 'precio_final'])
+    # Convertir fechas
+    df_filtrado['orden_pago_aprobado'] = pd.to_datetime(df_filtrado['orden_pago_aprobado'], errors='coerce')
+    df_filtrado = df_filtrado.dropna(subset=['orden_pago_aprobado'])
+    
+    # FILTRO PERÍODO
+    if periodo == "Último año":
+        fecha_limite = df_filtrado['orden_pago_aprobado'].max() - pd.DateOffset(years=1)
+        df_filtrado = df_filtrado[df_filtrado['orden_pago_aprobado'] >= fecha_limite]
+    
+    # FILTRO REGIÓN
+    if region != "Todas las regiones":
+        df_filtrado = df_filtrado[df_filtrado['region'] == region]
+    
+    # FILTRO CATEGORÍA
+    if categoria != "Todas las categorías":
+        df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
+    
+    return df_filtrado
 
-    df_real['Mes'] = df_real['orden_pago_aprobado'].dt.month
-    ingresos_reales = df_real.groupby('Mes')['precio_final'].sum().reset_index()
-    ingresos_reales['MesNombre'] = ingresos_reales['Mes'].apply(lambda x: calendar.month_name[x])
+# --- APLICAR FILTROS Y CALCULAR KPIS ---
+if 'df' in st.session_state:
+    # Aplicar filtros
+    df_filtrado = aplicar_filtros(st.session_state['df'], periodo_sel, region_sel, categoria_sel)
+    
+    if len(df_filtrado) > 0:
+        # Preparar fechas
+        df_filtrado['año'] = df_filtrado['orden_pago_aprobado'].dt.year
+        df_filtrado['mes'] = df_filtrado['orden_pago_aprobado'].dt.month
+        df_filtrado['trimestre'] = df_filtrado['orden_pago_aprobado'].dt.quarter
+        
+        # Obtener períodos para comparaciones
+        año_actual = df_filtrado['año'].max()
+        mes_actual = df_filtrado['mes'].max()
+        
+        # --- CALCULAR KPIS CON FILTROS APLICADOS ---
+        
+        # 1. INGRESOS TOTALES
+        ingresos_totales = df_filtrado['precio_final'].sum()
+        ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
+        ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
+        delta_ingresos = ((ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100) if ingresos_año_anterior > 0 else 0
+        
+        # 2. PEDIDOS TOTALES
+        pedidos_totales = df_filtrado['order_id'].nunique()
+        pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
+        pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
+        delta_pedidos = ((pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100) if pedidos_año_anterior > 0 else 0
+        
+        # 3. VALOR PROMEDIO
+        valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
+        valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
+        delta_valor = ((valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100) if valor_promedio_anterior > 0 else 0
+        
+        # 4. FLETE PROMEDIO
+        flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
+        flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
+        delta_flete = ((flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100) if flete_promedio_anterior > 0 else 0
+        
+        # --- RENDERIZAR TARJETAS CON DATOS FILTRADOS ---
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">Ingresos Totales</div>
+                        <div class="kpi-value">${ingresos_totales:,.0f}</div>
+                        <div class="{color_ingresos}">{delta_ingresos:.1f}% {'↑' if delta_ingresos >= 0 else '↓'}</div>
+                        <div class="kpi-subtext">vs año anterior</div>
+                    </div>""", unsafe_allow_html=True)
+        
+        with col2:
+            color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">Pedidos Totales</div>
+                        <div class="kpi-value">{pedidos_totales:,}</div>
+                        <div class="{color_pedidos}">{delta_pedidos:.1f}% {'↑' if delta_pedidos >= 0 else '↓'}</div>
+                        <div class="kpi-subtext">vs año anterior</div>
+                    </div>""", unsafe_allow_html=True)
+        
+        with col3:
+            color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">Valor Promedio</div>
+                        <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
+                        <div class="{color_valor}">{delta_valor:.1f}% {'↑' if delta_valor >= 0 else '↓'}</div>
+                        <div class="kpi-subtext">vs año anterior</div>
+                    </div>""", unsafe_allow_html=True)
+        
+        with col4:
+            color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">Flete Promedio</div>
+                        <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
+                        <div class="{color_flete}">{delta_flete:.1f}% {'↑' if delta_flete >= 0 else '↓'}</div>
+                        <div class="kpi-subtext">vs año anterior</div>
+                    </div>""", unsafe_allow_html=True)
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=ingresos_reales['MesNombre'],
-        y=ingresos_reales['precio_final'],
-        mode='lines+markers',
-        name='Datos reales',
-        line=dict(color=COLOR_PRIMARY, width=3),
-        marker=dict(size=8, color=COLOR_PRIMARY)
-    ))
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    # Buscar predicciones si se suben
-    pred_file = st.file_uploader("Sube archivo de predicción mensual", type=["csv", "xlsx"])
-    if pred_file:
-        try:
-            ext = pred_file.name.split(".")[-1]
-            df_pred = pd.read_csv(pred_file) if ext == "csv" else pd.read_excel(pred_file)
-            if 'Mes' in df_pred.columns and 'Ingreso_Predicho' in df_pred.columns:
-                df_pred['MesNombre'] = df_pred['Mes'].apply(lambda x: calendar.month_name[int(x)])
-                fig.add_trace(go.Scatter(
-                    x=df_pred['MesNombre'],
-                    y=df_pred['Ingreso_Predicho'],
-                    mode='lines+markers',
-                    name='Predicción',
-                    line=dict(color='#AAAAAA', width=2, dash='dot'),
-                    marker=dict(symbol='x', size=8, color='#AAAAAA')
-                ))
-                st.success("Predicción agregada a la gráfica.")
-            else:
-                st.warning("El archivo de predicción debe tener columnas 'Mes' e 'Ingreso_Predicho'.")
-        except Exception as e:
-            st.error(f"Error al leer archivo de predicción: {e}")
+        # --- GRÁFICAS CON DATOS FILTRADOS ---
+        
+        # Gráfica de tendencia mensual
+        st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
+        df_mensual = df_filtrado.groupby(df_filtrado['orden_pago_aprobado'].dt.to_period('M'))['precio_final'].sum().reset_index()
+        df_mensual['orden_pago_aprobado'] = df_mensual['orden_pago_aprobado'].astype(str)
+        
+        fig_tendencia = px.line(df_mensual, x='orden_pago_aprobado', y='precio_final', markers=True)
+        fig_tendencia.update_traces(
+            line=dict(color=COLOR_PRIMARY, width=3),
+            marker=dict(size=8, color=COLOR_PRIMARY)
+        )
+        fig_tendencia.update_layout(
+            height=350,
+            plot_bgcolor="#FFF",
+            paper_bgcolor="#FFF",
+            margin=dict(l=20, r=20, t=30, b=20),
+            xaxis=dict(title=None, showgrid=False),
+            yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
+            showlegend=False
+        )
+        st.plotly_chart(fig_tendencia, use_container_width=True)
 
-    fig.update_layout(
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+        # --- Segunda fila: Gráficas de región y categoría ---
+        col5, col6 = st.columns(2)
+        
+        with col5:
+            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
+            ingresos_por_region = df_filtrado.groupby('region')['precio_final'].sum().reset_index()
+            
+            fig_reg = px.pie(
+                ingresos_por_region,
+                names='region',
+                values='precio_final',
+                hole=0.5,
+                color_discrete_sequence=["#2F1C6A", "#7B3FF2", "#B39DDB", "#7FC7FF"]
+            )
+            fig_reg.update_traces(textinfo='label+percent', textfont_size=14)
+            fig_reg.update_layout(
+                showlegend=True,
+                legend=dict(orientation="v", y=0.5, x=-0.2, font=dict(color="#222")),
+                height=320,
+                margin=dict(l=40, r=20, t=20, b=20),
+                plot_bgcolor="#FFF",
+                paper_bgcolor="#FFF"
+            )
+            st.plotly_chart(fig_reg, use_container_width=True)
+        
+        with col6:
+            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
+            
+            # Crear datos para bubble chart con datos filtrados
+            bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
+                'precio_final': 'mean',  # % Margen (simulado)
+                'dias_entrega': lambda x: (x <= 7).mean() * 100,  # % Entregas a tiempo
+                'order_id': 'count'  # Tamaño de burbuja
+            }).reset_index()
+            
+            bubble_data.columns = ['Categoría', '% Margen', '% Entregas a tiempo', 'Tamaño']
+            
+            fig_bub = px.scatter(
+                bubble_data,
+                x="% Entregas a tiempo",
+                y="% Margen",
+                size="Tamaño",
+                color="Categoría",
+                color_discrete_sequence=["#7B3FF2", "#B39DDB", "#2F1C6A", "#7FC7FF"],
+                hover_name="Categoría"
+            )
+            fig_bub.update_layout(
+                height=320,
+                plot_bgcolor="#FFF",
+                paper_bgcolor="#FFF",
+                margin=dict(l=20, r=20, t=30, b=20),
+                legend=dict(orientation="v", y=0.5, x=1.1)
+            )
+            st.plotly_chart(fig_bub, use_container_width=True)
+
+    else:
+        st.warning("No hay datos que coincidan con los filtros seleccionados.")
+
+else:
+    # Mostrar tarjetas y gráficas vacías si no hay datos cargados
+    st.info("Sube tu base de datos para ver las métricas filtradas")
+
+    # Top cards vacías
+    col1, col2, col3, col4 = st.columns(4)
+    for col, label in zip(
+        [col1, col2, col3, col4],
+        ["Ingresos Totales", "Pedidos Totales", "Valor Promedio", "Flete Promedio"]
+    ):
+        with col:
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">{label}</div>
+                        <div class="kpi-value" style="color:#DDD;">---</div>
+                        <div class="kpi-subtext" style="color:#DDD;">Sin datos</div>
+                    </div>""", unsafe_allow_html=True)
+
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    # Gráfica de tendencia vacía
+    st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
+    fig_placeholder = px.line(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+    fig_placeholder.update_layout(
         height=350,
         plot_bgcolor="#FFF",
         paper_bgcolor="#FFF",
-        margin=dict(l=20, r=20, t=30, b=20),
-        font=dict(family="sans-serif", color="#222"),
-        xaxis=dict(title=None, showgrid=False, zeroline=False),
-        yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        xaxis=dict(showgrid=False, showticklabels=False),
+        yaxis=dict(showgrid=False, showticklabels=False),
+        annotations=[dict(text="Sin datos", x=0.5, y=0.5, showarrow=False, font=dict(size=20))]
     )
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("Sube primero el archivo de datos reales para ver la gráfica.")
+    st.plotly_chart(fig_placeholder, use_container_width=True)
 
-# --- Cálculo de métricas con columnas corregidas ---
-import numpy as np
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-# Convertimos la fecha correcta
-df['fecha'] = pd.to_datetime(df['orden_pago_aprobado'], errors='coerce')
-df = df.dropna(subset=['fecha'])
-df['trimestre'] = df['fecha'].dt.to_period('Q')
-df['año'] = df['fecha'].dt.year
-df['mes'] = df['fecha'].dt.month
-
-# --- Ingresos Totales ---
-ingresos_totales = df['precio_promedio_por_orden'].sum()
-
-# Variación mensual de ingresos
-mes_actual = df['mes'].max()
-anio_actual = df['año'].max()
-mes_anterior = mes_actual - 1 if mes_actual > 1 else 12
-
-ingresos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-ingresos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['precio_promedio_por_orden'].sum()
-delta_ingresos = ((ingresos_mes_actual - ingresos_mes_anterior) / ingresos_mes_anterior) * 100 if ingresos_mes_anterior != 0 else 0
-
-# --- Pedidos Totales ---
-pedidos_totales = df['order_id'].nunique()
-pedidos_mes_actual = df[(df['mes'] == mes_actual) & (df['año'] == anio_actual)]['order_id'].nunique()
-pedidos_mes_anterior = df[(df['mes'] == mes_anterior) & (df['año'] == anio_actual)]['order_id'].nunique()
-delta_pedidos = ((pedidos_mes_actual - pedidos_mes_anterior) / pedidos_mes_anterior) * 100 if pedidos_mes_anterior != 0 else 0
-
-# --- Valor Promedio ---
-valor_trimestre_actual = df[df['trimestre'] == df['trimestre'].max()]['precio_promedio_por_orden'].mean()
-valor_trimestre_anterior = df[df['trimestre'] == df['trimestre'].max() - 1]['precio_promedio_por_orden'].mean()
-delta_valor = ((valor_trimestre_actual - valor_trimestre_anterior) / valor_trimestre_anterior) * 100 if valor_trimestre_anterior != 0 else 0
-
-# --- Flete Promedio ---
-flete_actual = df[df['año'] == anio_actual]['costo_de_flete'].mean()
-flete_anterior = df[df['año'] == anio_actual - 1]['costo_de_flete'].mean()
-delta_flete = ((flete_actual - flete_anterior) / flete_anterior) * 100 if flete_anterior != 0 else 0
-
-#Linea divisora
-st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-# --- Segunda fila de visualizaciones ---
-col5, col6 = st.columns(2)
-with col5:
-    st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
-    regiones = ["Norte", "Sur", "Este", "Oeste"]
-    valores = [12000, 15000, 11000, 10000]
-    fig_reg = px.pie(
-        names=regiones,
-        values=valores,
-        hole=0.5,
-        color_discrete_sequence=["#2F1C6A", "#7B3FF2", "#B39DDB", "#7FC7FF"]
-    )
-    fig_reg.update_traces(
-        textinfo='percent+label',
-        textfont_size=15
-    )
-    fig_reg.update_layout(
-        showlegend=True,
-        legend=dict(orientation="v", y=0.5, x=1.1, font=dict(color="#222")),
-        height=320,
-        margin=dict(l=20, r=20, t=30, b=20),
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF"
-    )
-    st.plotly_chart(fig_reg, use_container_width=True)
-with col6:
-    st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
-    categorias = ["Electrónica", "Ropa", "Hogar", "Alimentos"]
-    margen = [25, 18, 15, 10]
-    entregas = [80, 95, 90, 85]
-    tamanio = [30, 20, 15, 10]
-    df_burbujas = pd.DataFrame({
-        "Categoría": categorias,
-        "% Margen": margen,
-        "% Entregas a tiempo": entregas,
-        "Tamaño": tamanio
-    })
-    fig_bub = px.scatter(
-        df_burbujas,
-        x="% Entregas a tiempo",
-        y="% Margen",
-        size="Tamaño",
-        color="Categoría",
-        color_discrete_sequence=["#7B3FF2", "#B39DDB", "#2F1C6A", "#7FC7FF"],
-        hover_name="Categoría"
-    )
-    fig_bub.update_layout(
-        height=320,
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF",
-        margin=dict(l=20, r=20, t=30, b=20),
-        font=dict(family="sans-serif", color="#222"),
-        legend=dict(orientation="v", y=0.5, x=1.1)
-    )
-    st.plotly_chart(fig_bub, use_container_width=True)
+    # Gráficas inferiores vacías
+    col5, col6 = st.columns(2)
+    with col5:
+        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
+        fig_placeholder2 = px.pie(values=[], names=[])
+        fig_placeholder2.update_layout(
+            annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
+            showlegend=False,
+            height=320
+        )
+        st.plotly_chart(fig_placeholder2, use_container_width=True)
+    with col6:
+        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
+        fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+        fig_placeholder3.update_layout(
+            annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
+            showlegend=False,
+            height=320
+        )
+        st.plotly_chart(fig_placeholder3, use_container_width=True)
