@@ -149,10 +149,19 @@ with st.sidebar:
 
             resultado = subprocess.run(
                 [sys.executable, "modelo_v1.py"],
-                capture_output=True, text=True
+                 capture_output=True, text=True
             )
-            if resultado.returncode != 0:
-                st.error(f"Error en el modelo: {resultado.stderr}")
+
+            # Mostrar logs del modelo
+            if resultado.returncode == 0:
+                st.success("✅ Modelo ejecutado correctamente")
+                st.text("Salida del modelo:")
+                st.code(resultado.stdout, language='bash')
+            else:
+                st.error("❌ Error al ejecutar el modelo")
+                st.text("Detalles del error:")
+                st.code(resultado.stderr, language='bash')
+
 
             if os.path.exists("prediccion_mes_siguiente.csv"):
                 df_pred = pd.read_csv("prediccion_mes_siguiente.csv")
@@ -290,14 +299,34 @@ if 'df' in st.session_state:
         ))
         df_pred_plot = df_total[df_total["Tipo"] == "pred"]
         if not df_pred_plot.empty:
+            # Unir último punto real + puntos predichos (solo para trazo de línea)
+            df_pred_union = df_pred_plot.copy()
+            df_pred_union.loc[df_pred_union.index[0], "precio_final"] = None  # Para no duplicar visualmente el último punto
+
             fig_tendencia.add_trace(go.Scatter(
-                x=df_pred_plot["MesIndex"],
-                y=df_pred_plot["precio_final"],
+                x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
+                y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
                 mode='lines+markers',
                 name='Predicción mes siguiente',
                 line=dict(color='#AAAAAA', width=2, dash='dot'),
-                marker=dict(size=8, color='#AAAAAA')
+                marker=dict(size=[0] + [8] * len(df_pred_plot), color=['#7B3FF2'] + ['#AAAAAA'] * (len(df_pred_plot)))
             ))
+
+            # Solo mostrar anotación en el primer punto predicho
+            pred_mes = df_pred_plot.iloc[0]
+            fig_tendencia.add_annotation(
+                x=pred_mes["MesIndex"],
+                y=pred_mes["precio_final"],
+                text="Mes Predicho",
+                showarrow=True,
+                arrowhead=1,
+                ax=0,
+                ay=-40,
+                font=dict(color="#AAAAAA", size=12, family="sans-serif"),
+                bgcolor="#FFF",
+                bordercolor="#AAAAAA"
+            )
+
 
             pred_mes = df_pred_plot.iloc[0]
             fig_tendencia.add_annotation(
