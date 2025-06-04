@@ -7,18 +7,53 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import random
+import plotly.graph_objs as go
 
 COLOR_PRIMARY = "#7B3FF2"
 COLOR_ACCENT = "#23C16B"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#F6F6FB"
 
-st.set_page_config(
-    page_title="Panel de Entregas",
-    layout="wide",
-    page_icon="🚚",
-    initial_sidebar_state="expanded"
-)
+@st.dialog("Optimizar rutas de entrega", width="large")
+def dialog_optimizar_rutas():
+    st.write("### Costo estimado por ruta")
+    categorias1 = ["Ruta A", "Ruta B", "Ruta C"]
+    valores1 = [120, 95, 130]
+    fig1 = px.bar(x=categorias1, y=valores1, labels={'x': 'Ruta', 'y': 'Costo estimado'})
+    fig1.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig1, use_container_width=True)
+    st.write("Este gráfico ilustra el costo estimado para cada ruta. "
+            "Ajusta las listas 'categorias1' y 'valores1' en el código "
+            "para modificar los datos mostrados.")
+    if st.button("Cerrar"): st.rerun()
+
+@st.dialog("Mejorar gestión de stock", width="large")
+def dialog_mejorar_stock():
+    st.write("### Unidades en inventario por producto")
+    categorias2 = ["Producto X", "Producto Y", "Producto Z"]
+    valores2 = [450, 320, 275]
+    fig2 = px.bar(x=categorias2, y=valores2, labels={'x': 'Producto', 'y': 'Unidades en Stock'})
+    fig2.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig2, use_container_width=True)
+    st.write("Este gráfico muestra la cantidad de unidades en stock para cada producto."
+            "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos.")
+    if st.button("Cerrar"): st.rerun()
+
+@st.dialog("Ofertas segmentadas", width="large")
+def dialog_ofertas_segmentadas():
+    st.write("### Tasa de conversión por segmento")
+    segmentos = ["Segmento A", "Segmento B", "Segmento C"]
+    conversiones = [0.12, 0.08, 0.15]
+    fig3 = px.bar(x=segmentos, y=conversiones, labels={'x': 'Segmento', 'y': 'Tasa de conversión'})
+    fig3.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig3, use_container_width=True)
+    st.write("Este gráfico representa la tasa de conversión por segmento. "
+            "Cambia las listas 'segmentos' y 'conversiones' en el código "
+            "para reflejar tus propios datos.")
+    if st.button("Cerrar"): st.rerun()
+
+st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st.markdown(f"""
     <style>
@@ -182,10 +217,10 @@ with st.sidebar:
 
     if 'df' in st.session_state:
         df_filtros = st.session_state['df'].copy()
-        df_filtros['orden_pago_aprobado'] = pd.to_datetime(
-            df_filtros['orden_pago_aprobado'], errors='coerce'
+        df_filtros['orden_compra_timestamp'] = pd.to_datetime(
+            df_filtros['orden_compra_timestamp'], errors='coerce'
         )
-        df_filtros = df_filtros.dropna(subset=['orden_pago_aprobado'])
+        df_filtros = df_filtros.dropna(subset=['orden_compra_timestamp'])
 
         regiones = ["Todas las regiones"] + sorted(
             df_filtros['region'].dropna().unique().tolist()
@@ -228,25 +263,21 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-    # Recomendación 1
-    col_check1, col_text1 = st.columns([1, 10])
-    rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
-    if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
-        dialog_optimizar_rutas()
+    with st.sidebar:
+        col_check1, col_text1 = st.columns([1, 10])
+        rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
+        if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
+            dialog_optimizar_rutas()
 
-    # Recomendación 2
-    col_check2, col_text2 = st.columns([1, 10])
-    rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
-    if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
-        dialog_mejorar_stock()
+        col_check2, col_text2 = st.columns([1, 10])
+        rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
+        if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
+            dialog_mejorar_stock()
 
-    # Recomendación 3
-    col_check3, col_text3 = st.columns([1, 10])
-    rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
-    if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
-        dialog_ofertas_segmentadas()
-
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
+        col_check3, col_text3 = st.columns([1, 10])
+        rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
+        if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
+            dialog_ofertas_segmentadas()
 
     uploaded_file = st.file_uploader(
         "Subir base de datos",
@@ -303,14 +334,14 @@ with st.sidebar:
 def aplicar_filtros(df, periodo, region, categoria):
     """Aplica todos los filtros al dataframe"""
     df_filtrado = df.copy()
-    df_filtrado['orden_pago_aprobado'] = pd.to_datetime(
-        df_filtrado['orden_pago_aprobado'], errors='coerce'
+    df_filtrado['orden_compra_timestamp'] = pd.to_datetime(
+        df_filtrado['orden_compra_timestamp'], errors='coerce'
     )
-    df_filtrado = df_filtrado.dropna(subset=['orden_pago_aprobado'])
+    df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
 
     if periodo == "Último año":
-        fecha_limite = df_filtrado['orden_pago_aprobado'].max() - pd.DateOffset(years=1)
-        df_filtrado = df_filtrado[df_filtrado['orden_pago_aprobado'] >= fecha_limite]
+        fecha_limite = df_filtrado['orden_compra_timestamp'].max() - pd.DateOffset(years=1)
+        df_filtrado = df_filtrado[df_filtrado['orden_compra_timestamp'] >= fecha_limite]
 
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
@@ -335,9 +366,9 @@ if 'df' in st.session_state:
     )
 
     if len(df_filtrado) > 0:
-        df_filtrado['año'] = df_filtrado['orden_pago_aprobado'].dt.year
-        df_filtrado['mes'] = df_filtrado['orden_pago_aprobado'].dt.month
-        df_filtrado['trimestre'] = df_filtrado['orden_pago_aprobado'].dt.quarter
+        df_filtrado['año'] = df_filtrado['orden_compra_timestamp'].dt.year
+        df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+        df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
 
         año_actual = df_filtrado['año'].max()
         mes_actual = df_filtrado['mes'].max()
@@ -446,9 +477,18 @@ if 'df' in st.session_state:
             "Tendencia de Ingresos Mensuales</h4>",
             unsafe_allow_html=True
         )
-        df_filtrado['Mes'] = df_filtrado['orden_pago_aprobado'].dt.month
-        df_filtrado['Año'] = df_filtrado['orden_pago_aprobado'].dt.year
+        df_filtrado['Año'] = df_filtrado['orden_compra_timestamp'].dt.year
+        df_filtrado['Mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+        df_filtrado['Dia'] = df_filtrado['orden_compra_timestamp'].dt.day
+
+        dias_por_mes = df_filtrado.groupby(['Año', 'Mes'])['Dia'].nunique().reset_index()
+        dias_por_mes.rename(columns={'Dia': 'DiasRegistrados'}, inplace=True)
+
+        MIN_DIAS_MES = 28
+        meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
+
         df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
+        df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
         df_mensual['Tipo'] = "real"
 
         if not df_pred.empty:
@@ -473,6 +513,7 @@ if 'df' in st.session_state:
             line=dict(color="#3B82F6", width=3),
             marker=dict(size=8, color="#3B82F6")
         ))
+
         df_pred_plot = df_total[df_total["Tipo"] == "pred"]
         if not df_pred_plot.empty:
             df_pred_union = df_pred_plot.copy()
@@ -551,41 +592,98 @@ if 'df' in st.session_state:
                 paper_bgcolor="#FFF"
             )
             st.plotly_chart(fig_reg, use_container_width=True)
-
+            
         with col6:
-            st.markdown(
-                f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
-                "Distribución por Categoría</h5>",
-                unsafe_allow_html=True
-            )
+            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
+
+            categorias = df_filtrado['categoria_simplificada'].unique()
+
+            # Genera colores aleatorios en formato hexadecimal
+            colores_random = [
+                "#b39ddb",  # lavanda
+                "#c5cae9",  # azul pastel
+                "#9fa8da",  # azul violeta
+                "#ce93d8",  # rosa lavanda
+                "#90caf9",  # celeste pastel
+                "#f48fb1",  # rosa claro
+                "#a5d6a7",  # verde suave
+                "#9575cd",  # violeta
+                "#81d4fa",  # celeste
+                "#cfd8dc",  # gris pastel
+                "#e1bee7",  # rosa lavanda
+                "#b3e5fc"   # azul claro pastel
+            ][:len(categorias)]
+
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
+                'costo_de_flete': 'mean',
                 'precio_final': 'mean',
-                'dias_entrega': lambda x: (x <= 7).mean() * 100,
+                'peso_volumetrico_kg': 'mean',
                 'order_id': 'count'
             }).reset_index()
 
-            bubble_data.columns = ['Categoría', '% Margen', '% Entregas a tiempo', 'Tamaño']
+            bubble_data.columns = ['Categoría', 'Costo de Flete', 'Precio Final', 'Peso Volumétrico (kg)', 'Tamaño']
 
-            fig_bub = px.scatter(
-                bubble_data,
-                x="% Entregas a tiempo",
-                y="% Margen",
-                size="Tamaño",
-                color="Categoría",
-                color_discrete_sequence=["#7B3FF2", "#B39DDB", "#2F1C6A", "#7FC7FF"],
-                hover_name="Categoría"
-            )
+            fig_bub = go.Figure()
+
+            size_values = bubble_data['Peso Volumétrico (kg)'] * 15
+            sizeref = 2. * max(size_values) / (80 ** 2)
+
+            for idx, row in bubble_data.iterrows():
+                fig_bub.add_trace(go.Scatter(
+                    x=[row['Costo de Flete']],
+                    y=[row['Precio Final']],
+                    mode='markers',
+                    marker=dict(
+                        size=row['Peso Volumétrico (kg)'] * 15,
+                        color=colores_random[idx],
+                        sizemode='area',
+                        sizeref=sizeref,
+                        sizemin=8,
+                        opacity=0.5,  # <- transparencia suave
+                        line=dict(width=1, color="rgba(0,0,0,0.1)")  # borde sutil
+                    ),
+
+                    name=row['Categoría'],
+                    hovertemplate=f"<b>{row['Categoría']}</b><br>Costo de Flete: {row['Costo de Flete']:.2f}<br>Precio Final: {row['Precio Final']:.2f}<br>Peso Volumétrico (kg): {row['Peso Volumétrico (kg)']:.2f}<extra></extra>",
+                    visible=True
+                ))
+
+            visible_legendonly = ['legendonly'] * len(categorias)
+            visible_true = [True] * len(categorias)
+
             fig_bub.update_layout(
                 height=320,
                 plot_bgcolor="#FFF",
                 paper_bgcolor="#FFF",
                 margin=dict(l=20, r=20, t=30, b=20),
-                legend=dict(orientation="v", y=0.5, x=1.1)
+                legend=dict(orientation="v", y=0.5, x=1.1),
+                updatemenus=[
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        buttons=[
+                            dict(
+                                args=[{"visible": visible_legendonly}],
+                                label="❌ Quitar todas",
+                                method="restyle"
+                            ),
+                            dict(
+                                args=[{"visible": visible_true}],
+                                label="✅ Mostrar todas",
+                                method="restyle"
+                            )
+                        ],
+                        pad={"r": 10, "t": 10},
+                        showactive=False,
+                        x=0,
+                        xanchor="left",
+                        y=1.15,
+                        yanchor="top"
+                    )
+                ]
             )
-            st.plotly_chart(fig_bub, use_container_width=True)
 
-    else:
-        st.warning("No hay datos que coincidan con los filtros seleccionados.")
+            st.plotly_chart(fig_bub, use_container_width=True)
 
 else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
@@ -641,11 +739,7 @@ else:
         st.plotly_chart(fig_placeholder2, use_container_width=True)
 
     with col6:
-        st.markdown(
-            f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
-            "Distribución por Categoría</h5>",
-            unsafe_allow_html=True
-        )
+        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
         fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
         fig_placeholder3.update_layout(
             annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
