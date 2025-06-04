@@ -7,6 +7,8 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import random
+import plotly.graph_objs as go
 
 COLOR_PRIMARY = "#7B3FF2"
 COLOR_ACCENT = "#23C16B"
@@ -387,36 +389,97 @@ if 'df' in st.session_state:
             st.plotly_chart(fig_reg, use_container_width=True)
         
         with col6:
-            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
+
+            categorias = df_filtrado['categoria_simplificada'].unique()
+
+            # Genera colores aleatorios en formato hexadecimal
+            colores_random = [
+                "#b39ddb",  # lavanda
+                "#c5cae9",  # azul pastel
+                "#9fa8da",  # azul violeta
+                "#ce93d8",  # rosa lavanda
+                "#90caf9",  # celeste pastel
+                "#f48fb1",  # rosa claro
+                "#a5d6a7",  # verde suave
+                "#9575cd",  # violeta
+                "#81d4fa",  # celeste
+                "#cfd8dc",  # gris pastel
+                "#e1bee7",  # rosa lavanda
+                "#b3e5fc"   # azul claro pastel
+            ][:len(categorias)]
+
 
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
+                'costo_de_flete': 'mean',
                 'precio_final': 'mean',
-                'dias_entrega': lambda x: (x <= 7).mean() * 100,
+                'peso_volumetrico_kg': 'mean',
                 'order_id': 'count'
             }).reset_index()
-            
-            bubble_data.columns = ['Categoría', '% Margen', '% Entregas a tiempo', 'Tamaño']
-            
-            fig_bub = px.scatter(
-                bubble_data,
-                x="% Entregas a tiempo",
-                y="% Margen",
-                size="Tamaño",
-                color="Categoría",
-                color_discrete_sequence=["#7B3FF2", "#B39DDB", "#2F1C6A", "#7FC7FF"],
-                hover_name="Categoría"
-            )
+
+            bubble_data.columns = ['Categoría', 'Costo de Flete', 'Precio Final', 'Peso Volumétrico (kg)', 'Tamaño']
+
+            fig_bub = go.Figure()
+
+            size_values = bubble_data['Peso Volumétrico (kg)'] * 15
+            sizeref = 2. * max(size_values) / (80 ** 2)
+
+            for idx, row in bubble_data.iterrows():
+                fig_bub.add_trace(go.Scatter(
+                    x=[row['Costo de Flete']],
+                    y=[row['Precio Final']],
+                    mode='markers',
+                    marker=dict(
+                        size=row['Peso Volumétrico (kg)'] * 15,
+                        color=colores_random[idx],
+                        sizemode='area',
+                        sizeref=sizeref,
+                        sizemin=8,
+                        opacity=0.5,  # <- transparencia suave
+                        line=dict(width=1, color="rgba(0,0,0,0.1)")  # borde sutil
+                    ),
+
+                    name=row['Categoría'],
+                    hovertemplate=f"<b>{row['Categoría']}</b><br>Costo de Flete: {row['Costo de Flete']:.2f}<br>Precio Final: {row['Precio Final']:.2f}<br>Peso Volumétrico (kg): {row['Peso Volumétrico (kg)']:.2f}<extra></extra>",
+                    visible=True
+                ))
+
+            visible_legendonly = ['legendonly'] * len(categorias)
+            visible_true = [True] * len(categorias)
+
             fig_bub.update_layout(
                 height=320,
                 plot_bgcolor="#FFF",
                 paper_bgcolor="#FFF",
                 margin=dict(l=20, r=20, t=30, b=20),
-                legend=dict(orientation="v", y=0.5, x=1.1)
+                legend=dict(orientation="v", y=0.5, x=1.1),
+                updatemenus=[
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        buttons=[
+                            dict(
+                                args=[{"visible": visible_legendonly}],
+                                label="❌ Quitar todas",
+                                method="restyle"
+                            ),
+                            dict(
+                                args=[{"visible": visible_true}],
+                                label="✅ Mostrar todas",
+                                method="restyle"
+                            )
+                        ],
+                        pad={"r": 10, "t": 10},
+                        showactive=False,
+                        x=0,
+                        xanchor="left",
+                        y=1.15,
+                        yanchor="top"
+                    )
+                ]
             )
-            st.plotly_chart(fig_bub, use_container_width=True)
 
-    else:
-        st.warning("No hay datos que coincidan con los filtros seleccionados.")
+            st.plotly_chart(fig_bub, use_container_width=True)
 
 else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
