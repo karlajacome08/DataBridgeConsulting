@@ -110,7 +110,6 @@ def walk_forward_validation_ensemble(df_temporal, n_months_val=3):
         scores.append(r2_score(y_val, y_pred))
         maes.append(mean_absolute_error(y_val, y_pred))
         rmses.append(np.sqrt(mean_squared_error(y_val, y_pred)))
-    # print(f"\nR² promedio walk-forward ensemble: {np.mean(scores):.3f}")
     # print(f"MAE promedio walk-forward ensemble: {np.mean(maes):.2f}")
     # print(f"RMSE promedio walk-forward ensemble: {np.mean(rmses):.2f}")
     return fechas, trues, preds
@@ -132,7 +131,7 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
     lags = ultimos_datos.copy()
     ultimo_dia_conocido = df_diario['ds'].max()
     ingresos_mensuales = []
-    for i in range(4, 0, -1):
+    for i in range(3, 0, -1):
         fecha = ultimo_dia_conocido - pd.DateOffset(months=i)
         primer_dia_mes = fecha.replace(day=1)
         ultimo_dia_mes = fecha.replace(day=calendar.monthrange(fecha.year, fecha.month)[1])
@@ -152,7 +151,7 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
     else:
         factor_ajuste = min(1.3, max(factor_ajuste, 1))
         tendencia_txt = "↑ SUBIDA"
-    print(f"\nTendencia detectada en últimos 4 meses: {tendencia_txt}")
+    print(f"\nTendencia detectada ultimos 3 meses: {tendencia_txt}")
     print(f"Factor de ajuste aplicado: {factor_ajuste:.2f}x")
     for fecha_pred in fechas_pred:
         dia_semana = fecha_pred.dayofweek
@@ -195,9 +194,9 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
         pred_rf = modelos[0].predict(features_df)[0]
         pred_xgb = modelos[1].predict(features_df)[0]
         pred = (pred_rf + pred_xgb) / 2
-        pred_ajustado = float(pred) * factor_ajuste
+        pred_ajustado = float(pred) * 1.2
         if pendiente > 0 and pred_ajustado < (np.mean(lags[-7:]) * 0.8):
-            pred_ajustado = np.mean(lags[-7:]) * factor_ajuste
+            pred_ajustado = np.mean(lags[-7:]) * 1.2
         predicciones.append(pred_ajustado)
         lags.append(pred_ajustado)
     return predicciones
@@ -257,7 +256,7 @@ resultados = pd.DataFrame({
     'Predicción': predicciones_todas
 })
 
-print("\nPredicción para el mes siguiente COMPLETO:")
+print("\nPredicción para el mes siguiente:")
 print(resultados.round(2).to_string(index=False))
 
 resultados['año_anterior'] = resultados['Fecha'].apply(lambda x: x.replace(year=x.year-1))
@@ -279,13 +278,8 @@ else:
     print("No hay datos históricos para comparar.")
 
 print(f"\nTotal predicho: ${total_predicho:,.2f}")
-print(f"\nTotal histórico: ${total_historico:,.2f}")
-print(f"\nTendencia: {tendencia}")
-
-if precision is not None:
-    print(f"\nPrecisión de la predicción: {precision:.2f}%")
-else:
-    print("\nNo se pudo calcular la precisión (falta histórico).")
+print(f"\nTotal año anterior: ${total_historico:,.2f}")
+# print(f"\nTendencia: {tendencia}")
 
 ultimo_real = df_diario[['ds', 'y']].iloc[-1]
 prediccion_conectada = pd.concat([
@@ -312,13 +306,11 @@ df_pred_mes.rename(columns={"Predicción": "precio_final"}, inplace=True)
 df_pred_mes["Tipo"] = "pred"
 
 output_path = os.path.abspath("prediccion_mes_siguiente.csv")
-print(f"Guardando predicción mensual en: {output_path}")
 
 if df_pred_mes.empty:
     print("Advertencia: df_pred_mes está vacío. No se guardará el archivo CSV.")
 else:
     try:
         df_pred_mes.to_csv(output_path, index=False, encoding="utf-8")
-        print(f"Archivo guardado correctamente en: {output_path}")
     except Exception as e:
         print(f"Error al guardar el archivo CSV: {e}")

@@ -129,11 +129,17 @@ with st.sidebar:
     
     if 'df' in st.session_state:
         df_filtros = st.session_state['df'].copy()
-        df_filtros['orden_pago_aprobado'] = pd.to_datetime(df_filtros['orden_pago_aprobado'], errors='coerce')
-        df_filtros = df_filtros.dropna(subset=['orden_pago_aprobado'])
-        
-        regiones = ["Todas las regiones"] + sorted(df_filtros['region'].dropna().unique().tolist())
-        categorias = ["Todas las categorías"] + sorted(df_filtros['categoria_simplificada'].dropna().unique().tolist())
+        df_filtros['orden_compra_timestamp'] = pd.to_datetime(
+            df_filtros['orden_compra_timestamp'], errors='coerce'
+        )
+        df_filtros = df_filtros.dropna(subset=['orden_compra_timestamp'])
+
+        regiones = ["Todas las regiones"] + sorted(
+            df_filtros['region'].dropna().unique().tolist()
+        )
+        categorias = ["Todas las categorías"] + sorted(
+            df_filtros['categoria_simplificada'].dropna().unique().tolist()
+        )
     else:
         regiones = ["Todas las regiones"]
         categorias = ["Todas las categorías"]
@@ -231,14 +237,15 @@ with st.sidebar:
 def aplicar_filtros(df, periodo, region, categoria):
     """Aplica todos los filtros al dataframe"""
     df_filtrado = df.copy()
-    
-    df_filtrado['orden_pago_aprobado'] = pd.to_datetime(df_filtrado['orden_pago_aprobado'], errors='coerce')
-    df_filtrado = df_filtrado.dropna(subset=['orden_pago_aprobado'])
-    
+    df_filtrado['orden_compra_timestamp'] = pd.to_datetime(
+        df_filtrado['orden_compra_timestamp'], errors='coerce'
+    )
+    df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
+
     if periodo == "Último año":
-        fecha_limite = df_filtrado['orden_pago_aprobado'].max() - pd.DateOffset(years=1)
-        df_filtrado = df_filtrado[df_filtrado['orden_pago_aprobado'] >= fecha_limite]
-    
+        fecha_limite = df_filtrado['orden_compra_timestamp'].max() - pd.DateOffset(years=1)
+        df_filtrado = df_filtrado[df_filtrado['orden_compra_timestamp'] >= fecha_limite]
+
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
     
@@ -251,10 +258,10 @@ if 'df' in st.session_state:
     df_filtrado = aplicar_filtros(st.session_state['df'], periodo_sel, region_sel, categoria_sel)
     
     if len(df_filtrado) > 0:
-        df_filtrado['año'] = df_filtrado['orden_pago_aprobado'].dt.year
-        df_filtrado['mes'] = df_filtrado['orden_pago_aprobado'].dt.month
-        df_filtrado['trimestre'] = df_filtrado['orden_pago_aprobado'].dt.quarter
-        
+        df_filtrado['año'] = df_filtrado['orden_compra_timestamp'].dt.year
+        df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+        df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
+
         año_actual = df_filtrado['año'].max()
         mes_actual = df_filtrado['mes'].max()
 
@@ -320,11 +327,24 @@ if 'df' in st.session_state:
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-        st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
-        
-        df_filtrado['Mes'] = df_filtrado['orden_pago_aprobado'].dt.month
-        df_filtrado['Año'] = df_filtrado['orden_pago_aprobado'].dt.year
+        # Gráfico de Tendencia Mensual
+        st.markdown(
+            f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+            "Tendencia de Ingresos Mensuales</h4>",
+            unsafe_allow_html=True
+        )
+        df_filtrado['Año'] = df_filtrado['orden_compra_timestamp'].dt.year
+        df_filtrado['Mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+        df_filtrado['Dia'] = df_filtrado['orden_compra_timestamp'].dt.day
+
+        dias_por_mes = df_filtrado.groupby(['Año', 'Mes'])['Dia'].nunique().reset_index()
+        dias_por_mes.rename(columns={'Dia': 'DiasRegistrados'}, inplace=True)
+
+        MIN_DIAS_MES = 28
+        meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
+
         df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
+        df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
         df_mensual['Tipo'] = "real"
 
         if not df_pred.empty:
@@ -349,6 +369,7 @@ if 'df' in st.session_state:
             line=dict(color="#3B82F6", width=3),
             marker=dict(size=8, color="#3B82F6")
         ))
+
         df_pred_plot = df_total[df_total["Tipo"] == "pred"]
         if not df_pred_plot.empty:
             # Unir último punto real + puntos predichos (solo para trazo de línea)
