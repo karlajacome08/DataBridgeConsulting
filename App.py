@@ -15,6 +15,44 @@ COLOR_ACCENT = "#23C16B"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#F6F6FB"
 
+@st.dialog("Optimizar rutas de entrega", width="large")
+def dialog_optimizar_rutas():
+    st.write("### Costo estimado por ruta")
+    categorias1 = ["Ruta A", "Ruta B", "Ruta C"]
+    valores1 = [120, 95, 130]
+    fig1 = px.bar(x=categorias1, y=valores1, labels={'x': 'Ruta', 'y': 'Costo estimado'})
+    fig1.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig1, use_container_width=True)
+    st.write("Este gráfico ilustra el costo estimado para cada ruta. "
+            "Ajusta las listas 'categorias1' y 'valores1' en el código "
+            "para modificar los datos mostrados.")
+    if st.button("Cerrar"): st.rerun()
+
+@st.dialog("Mejorar gestión de stock", width="large")
+def dialog_mejorar_stock():
+    st.write("### Unidades en inventario por producto")
+    categorias2 = ["Producto X", "Producto Y", "Producto Z"]
+    valores2 = [450, 320, 275]
+    fig2 = px.bar(x=categorias2, y=valores2, labels={'x': 'Producto', 'y': 'Unidades en Stock'})
+    fig2.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig2, use_container_width=True)
+    st.write("Este gráfico muestra la cantidad de unidades en stock para cada producto."
+            "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos.")
+    if st.button("Cerrar"): st.rerun()
+
+@st.dialog("Ofertas segmentadas", width="large")
+def dialog_ofertas_segmentadas():
+    st.write("### Tasa de conversión por segmento")
+    segmentos = ["Segmento A", "Segmento B", "Segmento C"]
+    conversiones = [0.12, 0.08, 0.15]
+    fig3 = px.bar(x=segmentos, y=conversiones, labels={'x': 'Segmento', 'y': 'Tasa de conversión'})
+    fig3.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
+    st.plotly_chart(fig3, use_container_width=True)
+    st.write("Este gráfico representa la tasa de conversión por segmento. "
+            "Cambia las listas 'segmentos' y 'conversiones' en el código "
+            "para reflejar tus propios datos.")
+    if st.button("Cerrar"): st.rerun()
+
 st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st.markdown(f"""
@@ -125,9 +163,21 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-    rec1 = st.checkbox("Optimizar rutas de entrega", value=rec_defaults[0], key='rec1')
-    rec2 = st.checkbox("Mejorar gestión de stock", value=rec_defaults[1], key='rec2')
-    rec3 = st.checkbox("Ofertas segmentadas", value=rec_defaults[2], key='rec3')
+    with st.sidebar:
+        col_check1, col_text1 = st.columns([1, 10])
+        rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
+        if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
+            dialog_optimizar_rutas()
+
+        col_check2, col_text2 = st.columns([1, 10])
+        rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
+        if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
+            dialog_mejorar_stock()
+
+        col_check3, col_text3 = st.columns([1, 10])
+        rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
+        if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
+            dialog_ofertas_segmentadas()
 
     uploaded_file = st.file_uploader(
         "Subir base de datos",
@@ -524,7 +574,7 @@ else:
         )
         st.plotly_chart(fig_placeholder2, use_container_width=True)
     with col6:
-        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Distribución por Categoría</h5>", unsafe_allow_html=True)
+        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
         fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
         fig_placeholder3.update_layout(
             annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
