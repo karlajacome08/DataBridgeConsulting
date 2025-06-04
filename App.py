@@ -117,6 +117,94 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+# --------------------
+# Definición de diálogos
+# --------------------
+
+@st.dialog("Optimizar rutas de entrega", width="large")
+def dialog_optimizar_rutas():
+    st.write("### Costo estimado por ruta")
+    # Variables modificables en el código:
+    categorias1 = ["Ruta A", "Ruta B", "Ruta C"]
+    valores1 = [120, 95, 130]
+    fig1 = px.bar(
+        x=categorias1,
+        y=valores1,
+        labels={'x': 'Ruta', 'y': 'Costo estimado'},
+        title="Costo estimado por ruta"
+    )
+    fig1.update_layout(
+        plot_bgcolor="#FFF",
+        paper_bgcolor="#FFF",
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+    st.write(
+        "Este gráfico ilustra el costo estimado para cada ruta. "
+        "Ajusta las listas 'categorias1' y 'valores1' en el código "
+        "para modificar los datos mostrados."
+    )
+    if st.button("Cerrar"):
+        st.rerun()
+
+
+
+@st.dialog("Mejorar gestión de stock", width="large")
+def dialog_mejorar_stock():
+    st.write("### Unidades en inventario por producto")
+    # Variables modificables en el código:
+    categorias2 = ["Producto X", "Producto Y", "Producto Z"]
+    valores2 = [450, 320, 275]
+    fig2 = px.bar(
+        x=categorias2,
+        y=valores2,
+        labels={'x': 'Producto', 'y': 'Unidades en Stock'},
+        title="Unidades en inventario por producto"
+    )
+    fig2.update_layout(
+        plot_bgcolor="#FFF",
+        paper_bgcolor="#FFF",
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    st.plotly_chart(fig2, use_container_width=True)
+    st.write(
+        "Este gráfico muestra la cantidad de unidades en stock para cada producto. "
+        "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos."
+    )
+    if st.button("Cerrar"):
+        st.rerun()
+
+
+@st.dialog("Ofertas segmentadas", width="large")
+def dialog_ofertas_segmentadas():
+    st.write("### Tasa de conversión por segmento")
+    # Variables modificables en el código:
+    segmentos = ["Segmento A", "Segmento B", "Segmento C"]
+    conversiones = [0.12, 0.08, 0.15]  # tasas de conversión
+    fig3 = px.bar(
+        x=segmentos,
+        y=conversiones,
+        labels={'x': 'Segmento', 'y': 'Tasa de conversión'},
+        title="Tasa de conversión por segmento"
+    )
+    fig3.update_layout(
+        plot_bgcolor="#FFF",
+        paper_bgcolor="#FFF",
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+    st.write(
+        "Este gráfico representa la tasa de conversión por segmento. "
+        "Cambia las listas 'segmentos' y 'conversiones' en el código "
+        "para reflejar tus propios datos."
+    )
+    if st.button("Cerrar"):
+        st.rerun()
+
+# --------------------
+# Sidebar con filtros y recomendaciones
+# --------------------
+
 with st.sidebar:
     try:
         st.image("logo_danu.png", width=180)
@@ -126,7 +214,7 @@ with st.sidebar:
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
     st.markdown("### Filtros")
-    
+
     if 'df' in st.session_state:
         df_filtros = st.session_state['df'].copy()
         df_filtros['orden_compra_timestamp'] = pd.to_datetime(
@@ -144,19 +232,24 @@ with st.sidebar:
         regiones = ["Todas las regiones"]
         categorias = ["Todas las categorías"]
 
-    periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
-    periodo_habilitados = ["Último año"]  # solo esta opción está activa
+    periodo_options = [
+        "Último año",
+        "Últimos 6 meses (Próximamente)",
+        "Último mes (Próximamente)"
+    ]
+    periodo_habilitados = ["Último año"]
 
     periodo_sel = st.selectbox("Periodo", periodo_options)
-
     if periodo_sel not in periodo_habilitados:
-        st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
+        st.warning(
+            "Esta opción estará disponible próximamente. "
+            "Por favor selecciona 'Último año'."
+        )
         st.stop()
-    
+
     region_sel = st.selectbox("Región", regiones)
-    
     categoria_sel = st.selectbox("Categoría", categorias)
-    
+
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
 
     rec_keys = ['rec1', 'rec2', 'rec3']
@@ -165,7 +258,8 @@ with st.sidebar:
     progreso_recomendaciones = int((recomendaciones_activadas / 3) * 100)
 
     st.markdown(
-        f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY};'>Recomendaciones ({progreso_recomendaciones}%)</h4>",
+        f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY};'>"
+        f"Recomendaciones ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
 
@@ -207,10 +301,10 @@ with st.sidebar:
 
             resultado = subprocess.run(
                 [sys.executable, "modelo_v1.py"],
-                 capture_output=True, text=True
+                capture_output=True,
+                text=True
             )
 
-            # Mostrar logs del modelo
             if resultado.returncode == 0:
                 st.success("✅ Modelo ejecutado correctamente")
                 st.text("Salida del modelo:")
@@ -219,7 +313,6 @@ with st.sidebar:
                 st.error("❌ Error al ejecutar el modelo")
                 st.text("Detalles del error:")
                 st.code(resultado.stderr, language='bash')
-
 
             if os.path.exists("prediccion_mes_siguiente.csv"):
                 df_pred = pd.read_csv("prediccion_mes_siguiente.csv")
@@ -233,6 +326,10 @@ with st.sidebar:
             st.error(f"Error general: {str(e)}")
     else:
         df_pred = pd.DataFrame()
+
+# --------------------
+# Función de filtrado
+# --------------------
 
 def aplicar_filtros(df, periodo, region, categoria):
     """Aplica todos los filtros al dataframe"""
@@ -248,15 +345,26 @@ def aplicar_filtros(df, periodo, region, categoria):
 
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
-    
+
     if categoria != "Todas las categorías":
-        df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
-    
+        df_filtrado = df_filtrado[
+            df_filtrado['categoria_simplificada'] == categoria
+        ]
+
     return df_filtrado
 
+# --------------------
+# Lógica principal: mostrar métricas y gráficos
+# --------------------
+
 if 'df' in st.session_state:
-    df_filtrado = aplicar_filtros(st.session_state['df'], periodo_sel, region_sel, categoria_sel)
-    
+    df_filtrado = aplicar_filtros(
+        st.session_state['df'],
+        periodo_sel,
+        region_sel,
+        categoria_sel
+    )
+
     if len(df_filtrado) > 0:
         df_filtrado['año'] = df_filtrado['orden_compra_timestamp'].dt.year
         df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
@@ -266,25 +374,53 @@ if 'df' in st.session_state:
         mes_actual = df_filtrado['mes'].max()
 
         ingresos_totales = df_filtrado['precio_final'].sum()
-        ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
-        ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
-        delta_ingresos = ((ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100) if ingresos_año_anterior > 0 else 0
-        
+        ingresos_año_actual = df_filtrado[
+            df_filtrado['año'] == año_actual
+        ]['precio_final'].sum()
+        ingresos_año_anterior = df_filtrado[
+            df_filtrado['año'] == (año_actual - 1)
+        ]['precio_final'].sum()
+        delta_ingresos = (
+            (ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100
+            if ingresos_año_anterior > 0 else 0
+        )
+
         pedidos_totales = df_filtrado['order_id'].nunique()
-        pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
-        pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
-        delta_pedidos = ((pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100) if pedidos_año_anterior > 0 else 0
-        
-        valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
-        valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
-        delta_valor = ((valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100) if valor_promedio_anterior > 0 else 0
-        
-        flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
-        flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
-        delta_flete = ((flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100) if flete_promedio_anterior > 0 else 0
-        
+        pedidos_año_actual = df_filtrado[
+            df_filtrado['año'] == año_actual
+        ]['order_id'].nunique()
+        pedidos_año_anterior = df_filtrado[
+            df_filtrado['año'] == (año_actual - 1)
+        ]['order_id'].nunique()
+        delta_pedidos = (
+            (pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100
+            if pedidos_año_anterior > 0 else 0
+        )
+
+        valor_promedio_actual = df_filtrado[
+            df_filtrado['año'] == año_actual
+        ]['precio_final'].mean()
+        valor_promedio_anterior = df_filtrado[
+            df_filtrado['año'] == (año_actual - 1)
+        ]['precio_final'].mean()
+        delta_valor = (
+            (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100
+            if valor_promedio_anterior > 0 else 0
+        )
+
+        flete_promedio_actual = df_filtrado[
+            df_filtrado['año'] == año_actual
+        ]['costo_de_flete'].mean()
+        flete_promedio_anterior = df_filtrado[
+            df_filtrado['año'] == (año_actual - 1)
+        ]['costo_de_flete'].mean()
+        delta_flete = (
+            (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100
+            if flete_promedio_anterior > 0 else 0
+        )
+
+        # KPI Cards
         col1, col2, col3, col4 = st.columns(4)
-        
         with col1:
             color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
             st.markdown(
@@ -293,8 +429,10 @@ if 'df' in st.session_state:
                         <div class="kpi-value">${ingresos_totales:,.0f}</div>
                         <div class="{color_ingresos}">{delta_ingresos:.1f}% {'↑' if delta_ingresos >= 0 else '↓'}</div>
                         <div class="kpi-subtext">vs año anterior</div>
-                    </div>""", unsafe_allow_html=True)
-        
+                    </div>""",
+                unsafe_allow_html=True
+            )
+
         with col2:
             color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
             st.markdown(
@@ -303,8 +441,10 @@ if 'df' in st.session_state:
                         <div class="kpi-value">{pedidos_totales:,}</div>
                         <div class="{color_pedidos}">{delta_pedidos:.1f}% {'↑' if delta_pedidos >= 0 else '↓'}</div>
                         <div class="kpi-subtext">vs año anterior</div>
-                    </div>""", unsafe_allow_html=True)
-        
+                    </div>""",
+                unsafe_allow_html=True
+            )
+
         with col3:
             color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
             st.markdown(
@@ -313,8 +453,10 @@ if 'df' in st.session_state:
                         <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
                         <div class="{color_valor}">{delta_valor:.1f}% {'↑' if delta_valor >= 0 else '↓'}</div>
                         <div class="kpi-subtext">vs año anterior</div>
-                    </div>""", unsafe_allow_html=True)
-        
+                    </div>""",
+                unsafe_allow_html=True
+            )
+
         with col4:
             color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
             st.markdown(
@@ -323,7 +465,9 @@ if 'df' in st.session_state:
                         <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
                         <div class="{color_flete}">{delta_flete:.1f}% {'↑' if delta_flete >= 0 else '↓'}</div>
                         <div class="kpi-subtext">vs año anterior</div>
-                    </div>""", unsafe_allow_html=True)
+                    </div>""",
+                unsafe_allow_html=True
+            )
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -348,8 +492,8 @@ if 'df' in st.session_state:
         df_mensual['Tipo'] = "real"
 
         if not df_pred.empty:
-            df_pred = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
-            df_total = pd.concat([df_mensual, df_pred], ignore_index=True)
+            df_pred_plot_total = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
+            df_total = pd.concat([df_mensual, df_pred_plot_total], ignore_index=True)
         else:
             df_total = df_mensual
 
@@ -372,9 +516,8 @@ if 'df' in st.session_state:
 
         df_pred_plot = df_total[df_total["Tipo"] == "pred"]
         if not df_pred_plot.empty:
-            # Unir último punto real + puntos predichos (solo para trazo de línea)
             df_pred_union = df_pred_plot.copy()
-            df_pred_union.loc[df_pred_union.index[0], "precio_final"] = None  # Para no duplicar visualmente el último punto
+            df_pred_union.loc[df_pred_union.index[0], "precio_final"] = None
 
             fig_tendencia.add_trace(go.Scatter(
                 x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
@@ -382,24 +525,11 @@ if 'df' in st.session_state:
                 mode='lines+markers',
                 name='Predicción mes siguiente',
                 line=dict(color='#AAAAAA', width=2, dash='dot'),
-                marker=dict(size=[0] + [8] * len(df_pred_plot), color=['#7B3FF2'] + ['#AAAAAA'] * (len(df_pred_plot)))
+                marker=dict(
+                    size=[0] + [8] * len(df_pred_plot),
+                    color=['#7B3FF2'] + ['#AAAAAA'] * len(df_pred_plot)
+                )
             ))
-
-            # Solo mostrar anotación en el primer punto predicho
-            pred_mes = df_pred_plot.iloc[0]
-            fig_tendencia.add_annotation(
-                x=pred_mes["MesIndex"],
-                y=pred_mes["precio_final"],
-                text="Mes Predicho",
-                showarrow=True,
-                arrowhead=1,
-                ax=0,
-                ay=-40,
-                font=dict(color="#AAAAAA", size=12, family="sans-serif"),
-                bgcolor="#FFF",
-                bordercolor="#AAAAAA"
-            )
-
 
             pred_mes = df_pred_plot.iloc[0]
             fig_tendencia.add_annotation(
@@ -434,13 +564,17 @@ if 'df' in st.session_state:
         )
 
         st.plotly_chart(fig_tendencia, use_container_width=True)
-        
+
+        # Gráficos por Región y Categoría
         col5, col6 = st.columns(2)
-        
         with col5:
-            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
+            st.markdown(
+                f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+                "Ingresos por Región</h5>",
+                unsafe_allow_html=True
+            )
             ingresos_por_region = df_filtrado.groupby('region')['precio_final'].sum().reset_index()
-            
+
             fig_reg = px.pie(
                 ingresos_por_region,
                 names='region',
@@ -458,7 +592,7 @@ if 'df' in st.session_state:
                 paper_bgcolor="#FFF"
             )
             st.plotly_chart(fig_reg, use_container_width=True)
-        
+            
         with col6:
             st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
 
@@ -479,7 +613,6 @@ if 'df' in st.session_state:
                 "#e1bee7",  # rosa lavanda
                 "#b3e5fc"   # azul claro pastel
             ][:len(categorias)]
-
 
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
                 'costo_de_flete': 'mean',
@@ -566,11 +699,17 @@ else:
                         <div class="kpi-label">{label}</div>
                         <div class="kpi-value" style="color:#DDD;">---</div>
                         <div class="kpi-subtext" style="color:#DDD;">Sin datos</div>
-                    </div>""", unsafe_allow_html=True)
+                    </div>""",
+                unsafe_allow_html=True
+            )
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-    st.markdown(f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Tendencia de Ingresos Mensuales</h4>", unsafe_allow_html=True)
+    st.markdown(
+        f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+        "Tendencia de Ingresos Mensuales</h4>",
+        unsafe_allow_html=True
+    )
     fig_placeholder = px.line(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
     fig_placeholder.update_layout(
         height=350,
@@ -586,7 +725,11 @@ else:
 
     col5, col6 = st.columns(2)
     with col5:
-        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Ingresos por Región</h5>", unsafe_allow_html=True)
+        st.markdown(
+            f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+            "Ingresos por Región</h5>",
+            unsafe_allow_html=True
+        )
         fig_placeholder2 = px.pie(values=[], names=[])
         fig_placeholder2.update_layout(
             annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
@@ -594,6 +737,7 @@ else:
             height=320
         )
         st.plotly_chart(fig_placeholder2, use_container_width=True)
+
     with col6:
         st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
         fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
