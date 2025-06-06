@@ -207,20 +207,21 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-    col_check1, col_text1 = st.columns([1, 10])
-    rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
-    if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
-        dialog_optimizar_rutas()
+    with st.sidebar:
+        col_check1, col_text1 = st.columns([1, 10])
+        rec1 = col_check1.checkbox(" ", value=rec_defaults[0], key='rec1')
+        if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
+            dialog_optimizar_rutas()
 
-    col_check2, col_text2 = st.columns([1, 10])
-    rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
-    if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
-        dialog_mejorar_stock()
+        col_check2, col_text2 = st.columns([1, 10])
+        rec2 = col_check2.checkbox(" ", value=rec_defaults[1], key='rec2')
+        if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
+            dialog_mejorar_stock()
 
-    col_check3, col_text3 = st.columns([1, 10])
-    rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
-    if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
-        dialog_ofertas_segmentadas()
+        col_check3, col_text3 = st.columns([1, 10])
+        rec3 = col_check3.checkbox(" ", value=rec_defaults[2], key='rec3')
+        if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
+            dialog_ofertas_segmentadas()
 
     uploaded_file = st.file_uploader(
         "Subir base de datos",
