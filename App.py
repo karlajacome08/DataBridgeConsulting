@@ -16,7 +16,7 @@ COLOR_PRIMARY = "#7B3FF2"
 COLOR_SECUNDARY = "#989898"
 COLOR_ACCENT = "#009944"
 COLOR_NEGATIVE = "#E14B64"
-COLOR_BG = "#F6F6FB"
+COLOR_BG = "#e0e0e0"
 
 # --------------------------------------
 # Funciones auxiliares para manejar colores (mapa)
@@ -100,15 +100,104 @@ st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="�
 
 st.markdown(f"""
     <style>
-    /* Contenedor de la tarjeta KPI */
+    /* ========== SIDEBAR GENERAL ========== */
+    section[data-testid="stSidebar"] {{
+        background-color: {COLOR_BG};
+        width: 400px !important;
+    }}
+
+    section[data-testid="stSidebar"] .stMarkdown {{
+        font-size: 1.2rem !important;
+    }}
+
+    section[data-testid="stSidebar"] h3 {{
+        font-size: 1.8rem !important;
+        font-weight: 700 !important;
+        color: {COLOR_PRIMARY} !important;
+    }}
+
+    section[data-testid="stSidebar"] h4 {{
+        font-size: 1.6rem !important;
+        font-weight: 700 !important;
+    }}
+
+    /* ========== FILTROS CON BORDE Y VISIBILIDAD ========== */
+    section[data-testid="stSidebar"] div[data-baseweb="select"] {{
+        border: 2px solid {COLOR_PRIMARY} !important;
+        border-radius: 8px !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 2px 8px rgba(123, 63, 242, 0.15) !important;
+        min-height: 45px !important;
+    }}
+
+    section[data-testid="stSidebar"] div[data-baseweb="select"] > div {{
+        font-size: 1.18rem !important;
+        font-weight: 400 !important;
+        color: #222 !important;
+        padding: 14px 18px !important;
+        min-height: 55px !important;
+        display: flex;
+        align-items: center;
+    }}
+
+    section[data-testid="stSidebar"] div[data-baseweb="select"] svg {{
+        width: 20px !important;
+        height: 20px !important;
+        color: {COLOR_PRIMARY} !important;
+    }}
+
+    section[data-testid="stSidebar"] .stSelectbox label {{
+        font-size: 1.25rem !important;
+        font-weight: 400 !important;
+        color: {COLOR_PRIMARY} !important;
+        margin-bottom: 8px !important;
+    }}
+
+    /* ========== RECOMENDACIONES ========== */
+    section[data-testid="stSidebar"] .stCheckbox {{
+        transform: scale(1.3) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button {{
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        padding: 8px 16px !important;
+        border: 2px solid {COLOR_PRIMARY} !important;
+        border-radius: 8px !important;
+        background-color: #FFFFFF !important;
+        color: {COLOR_PRIMARY} !important;
+        box-shadow: 0 2px 8px rgba(123, 63, 242, 0.10) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stButton button:hover {{
+        background-color: {COLOR_PRIMARY} !important;
+        color: #FFFFFF !important;
+    }}
+
+    /* ========== FILE UPLOADER ========== */
+    section[data-testid="stSidebar"] .stFileUploader {{
+        border: 2.5px dashed {COLOR_PRIMARY} !important;
+        border-radius: 12px !important;
+        padding: 10px !important;
+        background-color: #FFFFFF !important;
+        box-shadow: 0 4px 14px rgba(123, 63, 242, 0.12) !important;
+    }}
+
+    section[data-testid="stSidebar"] .stFileUploader label {{
+        font-size: 1.3rem !important;
+        font-weight: 400 !important;
+        color: {COLOR_PRIMARY} !important;
+    }}
+
+    /* ========== KPI CARDS  ========== */
     .kpi-card {{
         background: #FFF;
         border-radius: 16px;
         box-shadow: 0 4px 16px rgba(123, 63, 242, 0.3);
-        min-width: 180px;   /* Ajusta el ancho mínimo de la tarjeta */
-        min-height: 170px;   /* Ajusta el alto mínimo de la tarjeta */
+        min-width: 180px;
+        min-height: 170px;
         height: 100%;
-        padding: 16px 14px 10px 14px; /* Ajusta el padding interno */
+        padding: 16px 14px 10px 14px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -117,36 +206,32 @@ st.markdown(f"""
         box-sizing: border-box;
     }}
 
-    /* Título de la tarjeta (ej. Ingresos Totales) */
     .kpi-label {{
         color: {COLOR_PRIMARY};
         font-weight: 700;
-        font-size: 2.01rem; /* <--- AJUSTA tamaño del título aquí */
+        font-size: 2.01rem;
         margin-bottom: 4px;
     }}
 
-    /* Fila que contiene el valor principal y el delta */
     .kpi-value-row {{
         display: flex;
         align-items: flex-end;
         justify-content: center;
-        gap: 8px; /* <--- Espacio entre número y porcentaje */
+        gap: 8px;
         width: 100%;
         margin-bottom: 2px;
     }}
 
-    /* Valor principal (ej. $12,037,620) */
     .kpi-value {{
         color: #222;
-        font-size: 2.07rem; /* <--- AJUSTA tamaño del número principal aquí */
+        font-size: 2.07rem;
         font-weight: 900;
         letter-spacing: -1px;
         line-height: 1;
     }}
 
-    /* Porcentaje de cambio (verde/rojo) */
     .kpi-delta-pos, .kpi-delta-neg {{
-        font-size: 1.45rem; /* <--- AJUSTA tamaño del porcentaje aquí */
+        font-size: 1.45rem;
         font-weight: 900;
         margin-left: 4px;
         display: flex;
@@ -155,18 +240,14 @@ st.markdown(f"""
     }}
     .kpi-delta-pos {{ color: {COLOR_ACCENT}; }}
     .kpi-delta-neg {{ color: {COLOR_NEGATIVE}; }}
-
-    /* Texto "vs año anterior" */
     .kpi-subtext {{
         color: #222;
-        font-size: 1.30rem; /* <--- AJUSTA tamaño del texto inferior aquí */
+        font-size: 1.10rem;
         margin-top: 4px;
         letter-spacing: 0.5px;
     }}
     </style>
 """, unsafe_allow_html=True)
-
-
 
 # --------------------
 # Sidebar con filtros y recomendaciones
@@ -219,6 +300,7 @@ with st.sidebar:
     with st.sidebar:
         col_check1, col_text1 = st.columns([1, 10])
         rec1 = col_check1.checkbox(" ", value=rec_defaults[0], key='rec1')
+        
         if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
             dialog_optimizar_rutas()
 
@@ -232,8 +314,13 @@ with st.sidebar:
         if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
             dialog_ofertas_segmentadas()
 
+    # Título grande antes del uploader
+    st.markdown(
+         "<span style='font-size:1.6rem; font-weight:700; color:#7B3FF2;'>Subir base de datos</span>",
+        unsafe_allow_html=True
+)
     uploaded_file = st.file_uploader(
-        "Subir base de datos",
+        "",
         type=["csv", "xlsx", "xls", "txt", "parquet"],
         help="Formatos soportados: CSV, Excel (xlsx, xls), TXT, Parquet"
     )
@@ -471,8 +558,8 @@ if 'df' in st.session_state:
                 name='Predicción mes siguiente',
                 line=dict(color='#555555', width=4, dash='dot'),
                 marker=dict(
-                    size=[0] + [8] * len(df_pred_plot),
-                    color=['#7B3FF2'] + ['#AAAAAA'] * len(df_pred_plot)
+                    size=[0] + [14] * len(df_pred_plot),
+                    color=['#7B3FF2'] + ['#555555'] * len(df_pred_plot)
                 )
             ))
 
@@ -487,8 +574,9 @@ if 'df' in st.session_state:
                 ay=-40,
                 font=dict(color="#333333", size=14, family="sans-serif"),
                 bgcolor="#FFF",
-                bordercolor="#333333",
-                arrowcolor="#333333"    # Color fuerte para la flecha
+                bordercolor="#111",
+                borderwidth=3,
+                arrowcolor="#111"    # Color fuerte para la flecha
             )
 
         fig_tendencia.update_layout(
@@ -527,7 +615,12 @@ if 'df' in st.session_state:
                 yanchor="bottom",
                 y=1.02,
                 xanchor="right",
-                x=1
+                x=1,
+                font = dict (
+                    size = 16,
+                    family="sans-serif",
+                    color="#222"
+                )
             )
         )
 
@@ -725,7 +818,6 @@ if 'df' in st.session_state:
                 plot_bgcolor="#FFF",
                 paper_bgcolor="#FFF",
                 margin=dict(l=20, r=20, t=30, b=20),
-                # Eje X: grande
                 xaxis=dict(
                     title=dict(
                         text="Costo de Flete",
@@ -736,8 +828,10 @@ if 'df' in st.session_state:
                         color="#222"
                     )
                 ),
-                # Eje Y: Ingresos en negritas y grande
                 yaxis=dict(
+                    showgrid=True,  # Movido fuera de title
+                    gridcolor="#b0b0b0",  # Gris oscuro
+                    gridwidth=1,  # Más grueso
                     title=dict(
                         text="Ingresos",
                         font=dict(size=17, family="sans-serif", color="#222")
@@ -748,14 +842,13 @@ if 'df' in st.session_state:
                         color="#222"
                     )
                 ),
-                # Leyenda: grande y negritas
-                legend=dict(
+                legend=dict(  # Movido fuera de yaxis
                     orientation="v",
                     y=0.5,
                     x=1.1,
-                    font=dict(size=17, family="sans-serif",color="#222")
+                    font=dict(size=17, family="sans-serif", color="#222")
                 ),
-                updatemenus=[
+                updatemenus=[  # Movido fuera de yaxis
                     dict(
                         type="buttons",
                         direction="left",
@@ -782,6 +875,7 @@ if 'df' in st.session_state:
             )
 
             st.plotly_chart(fig_bub, use_container_width=True)
+
 
 else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
