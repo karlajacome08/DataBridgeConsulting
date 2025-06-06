@@ -13,7 +13,8 @@ from streamlit_folium import st_folium
 import streamlit.components.v1 as components  # <-- para incrustar HTML puro
 
 COLOR_PRIMARY = "#7B3FF2"
-COLOR_ACCENT = "#23C16B"
+COLOR_SECUNDARY = "#989898"
+COLOR_ACCENT = "#009944"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#F6F6FB"
 
@@ -99,65 +100,73 @@ st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="�
 
 st.markdown(f"""
     <style>
-    body {{
-        background-color: {COLOR_BG};
-    }}
-    .main {{
-        background-color: {COLOR_BG};
-    }}
+    /* Contenedor de la tarjeta KPI */
     .kpi-card {{
         background: #FFF;
-        border-radius: 14px;
-        box-shadow: 0 2px 12px rgba(123, 63, 242, 0.08);
-        padding: 18px 18px 10px 18px;
-        margin: 0 8px 0 0;
-        min-height: 90px;
+        border-radius: 16px;
+        box-shadow: 0 4px 16px rgba(123, 63, 242, 0.3);
+        min-width: 180px;   /* Ajusta el ancho mínimo de la tarjeta */
+        min-height: 170px;   /* Ajusta el alto mínimo de la tarjeta */
+        height: 100%;
+        padding: 16px 14px 10px 14px; /* Ajusta el padding interno */
         display: flex;
         flex-direction: column;
+        align-items: center;
         justify-content: center;
+        text-align: center;
+        box-sizing: border-box;
     }}
+
+    /* Título de la tarjeta (ej. Ingresos Totales) */
     .kpi-label {{
         color: {COLOR_PRIMARY};
-        font-weight: 600;
-        font-size: 1.1rem;
+        font-weight: 700;
+        font-size: 2.01rem; /* <--- AJUSTA tamaño del título aquí */
         margin-bottom: 4px;
     }}
-    .kpi-value {{
-        color: #222;
-        font-size: 2.1rem;
-        font-weight: 700;
+
+    /* Fila que contiene el valor principal y el delta */
+    .kpi-value-row {{
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 8px; /* <--- Espacio entre número y porcentaje */
+        width: 100%;
         margin-bottom: 2px;
     }}
-    .kpi-delta-pos {{
-        color: {COLOR_ACCENT};
-        font-size: 1rem;
-        font-weight: 600;
+
+    /* Valor principal (ej. $12,037,620) */
+    .kpi-value {{
+        color: #222;
+        font-size: 2.07rem; /* <--- AJUSTA tamaño del número principal aquí */
+        font-weight: 900;
+        letter-spacing: -1px;
+        line-height: 1;
     }}
-    .kpi-delta-neg {{
-        color: {COLOR_NEGATIVE};
-        font-size: 1rem;
-        font-weight: 600;
+
+    /* Porcentaje de cambio (verde/rojo) */
+    .kpi-delta-pos, .kpi-delta-neg {{
+        font-size: 1.45rem; /* <--- AJUSTA tamaño del porcentaje aquí */
+        font-weight: 900;
+        margin-left: 4px;
+        display: flex;
+        align-items: center;
+        line-height: 1;
     }}
+    .kpi-delta-pos {{ color: {COLOR_ACCENT}; }}
+    .kpi-delta-neg {{ color: {COLOR_NEGATIVE}; }}
+
+    /* Texto "vs año anterior" */
     .kpi-subtext {{
-        color: #888;
-        font-size: 0.95rem;
-        font-weight: 400;
-        margin-top: 0px;
-    }}
-    .divider {{
-        border-bottom: 2px solid #ECEAF6;
-        margin: 18px 0 18px 0;
-    }}
-    .sidebar-divider {{
-        border-bottom: 1.5px solid #ECEAF6;
-        margin: 16px 0 16px 0;
-    }}
-    .disabled-option {{
-        color: #CCCCCC !important;
-        background-color: #F5F5F5 !important;
+        color: #222;
+        font-size: 1.30rem; /* <--- AJUSTA tamaño del texto inferior aquí */
+        margin-top: 4px;
+        letter-spacing: 0.5px;
     }}
     </style>
 """, unsafe_allow_html=True)
+
+
 
 # --------------------
 # Sidebar con filtros y recomendaciones
@@ -202,7 +211,7 @@ with st.sidebar:
     progreso_recomendaciones = int((recomendaciones_activadas / 3) * 100)
 
     st.markdown(
-        f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY};'>"
+        f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY}; font-size: 1.4rem;'>"
         f"Recomendaciones ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
@@ -342,13 +351,17 @@ if 'df' in st.session_state:
 
         # KPI Cards
         col1, col2, col3, col4 = st.columns(4)
+
         with col1:
             color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_ingresos >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">Ingresos Totales</div>
-                        <div class="kpi-value">${ingresos_totales:,.0f}</div>
-                        <div class="{color_ingresos}">{delta_ingresos:.1f}% {'↑' if delta_ingresos >= 0 else '↓'}</div>
+                        <div class="kpi-label">🏦 Ingresos Totales</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${ingresos_totales:,.0f}</div>
+                            <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
+                        </div>
                         <div class="kpi-subtext">vs año anterior</div>
                     </div>""",
                 unsafe_allow_html=True
@@ -356,11 +369,14 @@ if 'df' in st.session_state:
 
         with col2:
             color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_pedidos >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">Pedidos Totales</div>
-                        <div class="kpi-value">{pedidos_totales:,}</div>
-                        <div class="{color_pedidos}">{delta_pedidos:.1f}% {'↑' if delta_pedidos >= 0 else '↓'}</div>
+                        <div class="kpi-label">📦 Pedidos Totales</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">{pedidos_totales:,}</div>
+                            <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
+                        </div>
                         <div class="kpi-subtext">vs año anterior</div>
                     </div>""",
                 unsafe_allow_html=True
@@ -368,11 +384,14 @@ if 'df' in st.session_state:
 
         with col3:
             color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_valor >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">Valor Promedio</div>
-                        <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
-                        <div class="{color_valor}">{delta_valor:.1f}% {'↑' if delta_valor >= 0 else '↓'}</div>
+                        <div class="kpi-label">💵 Valor Promedio</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
+                            <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
+                        </div>
                         <div class="kpi-subtext">vs año anterior</div>
                     </div>""",
                 unsafe_allow_html=True
@@ -380,11 +399,14 @@ if 'df' in st.session_state:
 
         with col4:
             color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_flete >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">Flete Promedio</div>
-                        <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
-                        <div class="{color_flete}">{delta_flete:.1f}% {'↑' if delta_flete >= 0 else '↓'}</div>
+                        <div class="kpi-label">🚚 Flete Promedio</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
+                            <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
+                        </div>
                         <div class="kpi-subtext">vs año anterior</div>
                     </div>""",
                 unsafe_allow_html=True
@@ -392,9 +414,11 @@ if 'df' in st.session_state:
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
+
+
         # Gráfico de Tendencia Mensual
         st.markdown(
-            f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+            f"<h4 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
             "Tendencia de Ingresos Mensuales</h4>",
             unsafe_allow_html=True
         )
@@ -419,7 +443,7 @@ if 'df' in st.session_state:
             df_total = df_mensual
 
         df_total = df_total.sort_values(["Año", "Mes"]).reset_index(drop=True)
-        df_total["MesNombre"] = df_total["Mes"].apply(lambda x: calendar.month_name[x])
+        df_total["MesAbrev"] = df_total["Mes"].apply(lambda x: calendar.month_abbr[x])
         df_total["MesIndex"] = (
             df_total["Año"].astype(str) + "-" + df_total["Mes"].astype(str).str.zfill(2)
         )
@@ -445,7 +469,7 @@ if 'df' in st.session_state:
                 y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
                 mode='lines+markers',
                 name='Predicción mes siguiente',
-                line=dict(color='#AAAAAA', width=2, dash='dot'),
+                line=dict(color='#555555', width=4, dash='dot'),
                 marker=dict(
                     size=[0] + [8] * len(df_pred_plot),
                     color=['#7B3FF2'] + ['#AAAAAA'] * len(df_pred_plot)
@@ -461,13 +485,14 @@ if 'df' in st.session_state:
                 arrowhead=1,
                 ax=0,
                 ay=-40,
-                font=dict(color="#AAAAAA", size=12, family="sans-serif"),
+                font=dict(color="#333333", size=14, family="sans-serif"),
                 bgcolor="#FFF",
-                bordercolor="#AAAAAA"
+                bordercolor="#333333",
+                arrowcolor="#333333"    # Color fuerte para la flecha
             )
 
         fig_tendencia.update_layout(
-            height=350,
+            height=500,
             plot_bgcolor="#FFF",
             paper_bgcolor="#FFF",
             margin=dict(l=20, r=20, t=30, b=20),
@@ -478,10 +503,32 @@ if 'df' in st.session_state:
                 zeroline=False,
                 tickmode='array',
                 tickvals=df_total["MesIndex"],
-                ticktext=[f"{row['MesNombre']} {row['Año']}" for _, row in df_total.iterrows()]
+                ticktext=[row['MesAbrev'] for _, row in df_total.iterrows()],
+                tickfont=dict(
+                    size=18,  # Más grande
+                    family="sans-serif",
+                    color="#222",
+                )
             ),
-            yaxis=dict(title=None, showgrid=True, gridcolor="#F3EFFF"),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            yaxis=dict(
+                title=None,
+                showgrid=True,
+                gridcolor="#b0b0b0",
+                gridwidth=2,          # Más grueso
+                rangemode="tozero",
+                tickfont=dict(
+                    size=18,  # Más grande
+                    family="sans-serif",
+                    color="#222",
+                )
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
         )
 
         st.plotly_chart(fig_tendencia, use_container_width=True)
@@ -490,7 +537,8 @@ if 'df' in st.session_state:
         col5, col6 = st.columns(2)
         with col5:
             st.markdown(
-                f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Mapa de Mesorregiones</h5>",
+                f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+                "Ingresos por Región</h5>",
                 unsafe_allow_html=True
             )
 
@@ -618,14 +666,21 @@ if 'df' in st.session_state:
             components.html(map_html, height=400, width=700)
 
         with col6:
-            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
+            st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
 
             categorias = df_filtrado['categoria_simplificada'].unique()
 
             colores_random = [
-                "#b39ddb",  "#c5cae9",  "#9fa8da",  "#ce93d8",
-                "#90caf9",  "#f48fb1",  "#a5d6a7",  "#9575cd",
-                "#81d4fa",  "#cfd8dc",  "#e1bee7",  "#b3e5fc"
+                "#1f77b4",  # Azul fuerte
+                "#d62728",  # Rojo fuerte
+                "#2ca02c",  # Verde fuerte
+                "#ff7f0e",  # Naranja fuerte
+                "#9467bd",  # Morado fuerte
+                "#8c564b",  # Marrón fuerte
+                "#e377c2",  # Rosa fuerte
+                "#7f7f7f",  # Gris fuerte
+                "#bcbd22",  # Amarillo verdoso fuerte
+                "#17becf",  # Cian fuerte
             ][:len(categorias)]
 
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
@@ -649,7 +704,7 @@ if 'df' in st.session_state:
                     mode='markers',
                     marker=dict(
                         size=row['Peso Volumétrico (kg)'] * 15,
-                        color=colores_random[idx],
+                        #color=colores_random[idx],
                         sizemode='area',
                         sizeref=sizeref,
                         sizemin=8,
@@ -665,25 +720,65 @@ if 'df' in st.session_state:
             visible_true = [True] * len(categorias)
 
             fig_bub.update_layout(
-                height=320,
+                height=450,
+                width=2000,
                 plot_bgcolor="#FFF",
                 paper_bgcolor="#FFF",
                 margin=dict(l=20, r=20, t=30, b=20),
-                legend=dict(orientation="v", y=0.5, x=1.1),
-                updatemenus=[{
-                    'type': "buttons",
-                    'direction': "left",
-                    'buttons': [
-                        {'args': [{"visible": visible_legendonly}], 'label': "❌ Quitar todas", 'method': "restyle"},
-                        {'args': [{"visible": visible_true}],    'label': "✅ Mostrar todas", 'method': "restyle"}
-                    ],
-                    'pad': {"r": 10, "t": 10},
-                    'showactive': False,
-                    'x': 0,
-                    'xanchor': "left",
-                    'y': 1.15,
-                    'yanchor': "top"
-                }]
+                # Eje X: grande
+                xaxis=dict(
+                    title=dict(
+                        text="Costo de Flete",
+                        font=dict(size=17, color="#222")
+                    ),
+                    tickfont=dict(
+                        size=15,
+                        color="#222"
+                    )
+                ),
+                # Eje Y: Ingresos en negritas y grande
+                yaxis=dict(
+                    title=dict(
+                        text="Ingresos",
+                        font=dict(size=17, family="sans-serif", color="#222")
+                    ),
+                    tickfont=dict(
+                        size=15,
+                        family="sans-serif",
+                        color="#222"
+                    )
+                ),
+                # Leyenda: grande y negritas
+                legend=dict(
+                    orientation="v",
+                    y=0.5,
+                    x=1.1,
+                    font=dict(size=17, family="sans-serif",color="#222")
+                ),
+                updatemenus=[
+                    dict(
+                        type="buttons",
+                        direction="left",
+                        buttons=[
+                            dict(
+                                args=[{"visible": visible_legendonly}],
+                                label="❌ Quitar todas",
+                                method="restyle"
+                            ),
+                            dict(
+                                args=[{"visible": visible_true}],
+                                label="✅ Mostrar todas",
+                                method="restyle"
+                            )
+                        ],
+                        pad={"r": 10, "t": 10},
+                        showactive=False,
+                        x=0,
+                        xanchor="left",
+                        y=1.15,
+                        yanchor="top"
+                    )
+                ]
             )
 
             st.plotly_chart(fig_bub, use_container_width=True)
@@ -692,8 +787,10 @@ else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
 
     col1, col2, col3, col4 = st.columns(4)
-    for col, label in zip([col1, col2, col3, col4],
-                          ["Ingresos Totales", "Pedidos Totales", "Valor Promedio", "Flete Promedio"]):
+    for col, label in zip(
+        [col1, col2, col3, col4],
+        ["🏦 Ingresos Totales", "📦 Pedidos Totales", "💵 Valor Promedio", "🚚 Flete Promedio"]
+    ):
         with col:
             st.markdown(
                 f"""<div class="kpi-card">
@@ -707,7 +804,7 @@ else:
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
     st.markdown(
-        f"<h4 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
+        f"<h4 style='color:{COLOR_PRIMARY};font-size:1.75rem; margin-bottom:0.5rem;'>"
         "Tendencia de Ingresos Mensuales</h4>",
         unsafe_allow_html=True
     )
@@ -727,8 +824,8 @@ else:
     col5, col6 = st.columns(2)
     with col5:
         st.markdown(
-            f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
-            "Mapa de Ingresos por Region</h5>",
+            f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+            "Ingresos por Región</h5>",
             unsafe_allow_html=True
         )
         # Mapa en estado 'sin datos'
@@ -741,13 +838,10 @@ else:
         st.plotly_chart(fig_empty_map, use_container_width=True)
 
     with col6:
-        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
-        fig_placeholder_bubble = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
-        fig_placeholder_bubble.update_layout(
-            height=320,
-            plot_bgcolor="#FFF",
-            paper_bgcolor="#FFF",
+        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
+        fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+        fig_placeholder3.update_layout(
             annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
             showlegend=False
         )
-        st.plotly_chart(fig_placeholder_bubble, use_container_width=True)
+        st.plotly_chart(fig_placeholder3, use_container_width=True)
