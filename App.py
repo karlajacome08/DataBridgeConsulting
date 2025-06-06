@@ -7,14 +7,50 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-import random
-import plotly.graph_objs as go
+import folium
+import requests
+from streamlit_folium import st_folium
+import streamlit.components.v1 as components  # <-- para incrustar HTML puro
 
 COLOR_PRIMARY = "#7B3FF2"
 COLOR_ACCENT = "#23C16B"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#F6F6FB"
 
+# --------------------------------------
+# Funciones auxiliares para manejar colores (mapa)
+# --------------------------------------
+def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    hex_color = hex_color.lstrip("#")
+    return (
+        int(hex_color[0:2], 16),
+        int(hex_color[2:4], 16),
+        int(hex_color[4:6], 16),
+    )
+
+def rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02x}{:02x}{:02x}".format(rgb[0], rgb[1], rgb[2])
+
+def blend_with_white(base_rgb: tuple[int, int, int], pct: float) -> str:
+    pct = max(min(pct, 100.0), 0.0)
+    white_rgb = (255, 255, 255)
+    factor = pct / 100.0
+    blended = (
+        int(white_rgb[0] + (base_rgb[0] - white_rgb[0]) * factor),
+        int(white_rgb[1] + (base_rgb[1] - white_rgb[1]) * factor),
+        int(white_rgb[2] + (base_rgb[2] - white_rgb[2]) * factor),
+    )
+    return rgb_to_hex(blended)
+
+# --------------------------------------
+# 1. Definir un único color base (púrpura) para el mapa
+# --------------------------------------
+COLOR_BASE_HEX = "#3E08A9"  # Púrpura intenso
+BASE_RGB = hex_to_rgb(COLOR_BASE_HEX)
+
+# --------------------------------------
+# 2. Diálogos (sin cambios)
+# --------------------------------------
 @st.dialog("Optimizar rutas de entrega", width="large")
 def dialog_optimizar_rutas():
     st.write("### Costo estimado por ruta")
@@ -24,9 +60,10 @@ def dialog_optimizar_rutas():
     fig1.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
     st.plotly_chart(fig1, use_container_width=True)
     st.write("Este gráfico ilustra el costo estimado para cada ruta. "
-            "Ajusta las listas 'categorias1' y 'valores1' en el código "
-            "para modificar los datos mostrados.")
-    if st.button("Cerrar"): st.rerun()
+             "Ajusta las listas 'categorias1' y 'valores1' en el código "
+             "para modificar los datos mostrados.")
+    if st.button("Cerrar"):
+        st.rerun()
 
 @st.dialog("Mejorar gestión de stock", width="large")
 def dialog_mejorar_stock():
@@ -36,9 +73,10 @@ def dialog_mejorar_stock():
     fig2 = px.bar(x=categorias2, y=valores2, labels={'x': 'Producto', 'y': 'Unidades en Stock'})
     fig2.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
     st.plotly_chart(fig2, use_container_width=True)
-    st.write("Este gráfico muestra la cantidad de unidades en stock para cada producto."
-            "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos.")
-    if st.button("Cerrar"): st.rerun()
+    st.write("Este gráfico muestra la cantidad de unidades en stock para cada producto. "
+             "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos.")
+    if st.button("Cerrar"):
+        st.rerun()
 
 @st.dialog("Ofertas segmentadas", width="large")
 def dialog_ofertas_segmentadas():
@@ -49,10 +87,14 @@ def dialog_ofertas_segmentadas():
     fig3.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
     st.plotly_chart(fig3, use_container_width=True)
     st.write("Este gráfico representa la tasa de conversión por segmento. "
-            "Cambia las listas 'segmentos' y 'conversiones' en el código "
-            "para reflejar tus propios datos.")
-    if st.button("Cerrar"): st.rerun()
+             "Cambia las listas 'segmentos' y 'conversiones' en el código "
+             "para reflejar tus propios datos.")
+    if st.button("Cerrar"):
+        st.rerun()
 
+# --------------------------------------
+# 3. Configuración de la página y estilos
+# --------------------------------------
 st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st.markdown(f"""
@@ -118,93 +160,8 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --------------------
-# Definición de diálogos
-# --------------------
-
-@st.dialog("Optimizar rutas de entrega", width="large")
-def dialog_optimizar_rutas():
-    st.write("### Costo estimado por ruta")
-    # Variables modificables en el código:
-    categorias1 = ["Ruta A", "Ruta B", "Ruta C"]
-    valores1 = [120, 95, 130]
-    fig1 = px.bar(
-        x=categorias1,
-        y=valores1,
-        labels={'x': 'Ruta', 'y': 'Costo estimado'},
-        title="Costo estimado por ruta"
-    )
-    fig1.update_layout(
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF",
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig1, use_container_width=True)
-    st.write(
-        "Este gráfico ilustra el costo estimado para cada ruta. "
-        "Ajusta las listas 'categorias1' y 'valores1' en el código "
-        "para modificar los datos mostrados."
-    )
-    if st.button("Cerrar"):
-        st.rerun()
-
-
-
-@st.dialog("Mejorar gestión de stock", width="large")
-def dialog_mejorar_stock():
-    st.write("### Unidades en inventario por producto")
-    # Variables modificables en el código:
-    categorias2 = ["Producto X", "Producto Y", "Producto Z"]
-    valores2 = [450, 320, 275]
-    fig2 = px.bar(
-        x=categorias2,
-        y=valores2,
-        labels={'x': 'Producto', 'y': 'Unidades en Stock'},
-        title="Unidades en inventario por producto"
-    )
-    fig2.update_layout(
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF",
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig2, use_container_width=True)
-    st.write(
-        "Este gráfico muestra la cantidad de unidades en stock para cada producto. "
-        "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos."
-    )
-    if st.button("Cerrar"):
-        st.rerun()
-
-
-@st.dialog("Ofertas segmentadas", width="large")
-def dialog_ofertas_segmentadas():
-    st.write("### Tasa de conversión por segmento")
-    # Variables modificables en el código:
-    segmentos = ["Segmento A", "Segmento B", "Segmento C"]
-    conversiones = [0.12, 0.08, 0.15]  # tasas de conversión
-    fig3 = px.bar(
-        x=segmentos,
-        y=conversiones,
-        labels={'x': 'Segmento', 'y': 'Tasa de conversión'},
-        title="Tasa de conversión por segmento"
-    )
-    fig3.update_layout(
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF",
-        margin=dict(l=20, r=20, t=40, b=20)
-    )
-    st.plotly_chart(fig3, use_container_width=True)
-    st.write(
-        "Este gráfico representa la tasa de conversión por segmento. "
-        "Cambia las listas 'segmentos' y 'conversiones' en el código "
-        "para reflejar tus propios datos."
-    )
-    if st.button("Cerrar"):
-        st.rerun()
-
-# --------------------
 # Sidebar con filtros y recomendaciones
 # --------------------
-
 with st.sidebar:
     try:
         st.image("logo_danu.png", width=180)
@@ -217,34 +174,21 @@ with st.sidebar:
 
     if 'df' in st.session_state:
         df_filtros = st.session_state['df'].copy()
-        df_filtros['orden_compra_timestamp'] = pd.to_datetime(
-            df_filtros['orden_compra_timestamp'], errors='coerce'
-        )
+        df_filtros['orden_compra_timestamp'] = pd.to_datetime(df_filtros['orden_compra_timestamp'], errors='coerce')
         df_filtros = df_filtros.dropna(subset=['orden_compra_timestamp'])
 
-        regiones = ["Todas las regiones"] + sorted(
-            df_filtros['region'].dropna().unique().tolist()
-        )
-        categorias = ["Todas las categorías"] + sorted(
-            df_filtros['categoria_simplificada'].dropna().unique().tolist()
-        )
+        regiones = ["Todas las regiones"] + sorted(df_filtros['region'].dropna().unique().tolist())
+        categorias = ["Todas las categorías"] + sorted(df_filtros['categoria_simplificada'].dropna().unique().tolist())
     else:
         regiones = ["Todas las regiones"]
         categorias = ["Todas las categorías"]
 
-    periodo_options = [
-        "Último año",
-        "Últimos 6 meses (Próximamente)",
-        "Último mes (Próximamente)"
-    ]
+    periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
     periodo_habilitados = ["Último año"]
 
     periodo_sel = st.selectbox("Periodo", periodo_options)
     if periodo_sel not in periodo_habilitados:
-        st.warning(
-            "Esta opción estará disponible próximamente. "
-            "Por favor selecciona 'Último año'."
-        )
+        st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
         st.stop()
 
     region_sel = st.selectbox("Región", regiones)
@@ -263,21 +207,20 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
-    with st.sidebar:
-        col_check1, col_text1 = st.columns([1, 10])
-        rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
-        if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
-            dialog_optimizar_rutas()
+    col_check1, col_text1 = st.columns([1, 10])
+    rec1 = col_check1.checkbox("", value=rec_defaults[0], key='rec1')
+    if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
+        dialog_optimizar_rutas()
 
-        col_check2, col_text2 = st.columns([1, 10])
-        rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
-        if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
-            dialog_mejorar_stock()
+    col_check2, col_text2 = st.columns([1, 10])
+    rec2 = col_check2.checkbox("", value=rec_defaults[1], key='rec2')
+    if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
+        dialog_mejorar_stock()
 
-        col_check3, col_text3 = st.columns([1, 10])
-        rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
-        if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
-            dialog_ofertas_segmentadas()
+    col_check3, col_text3 = st.columns([1, 10])
+    rec3 = col_check3.checkbox("", value=rec_defaults[2], key='rec3')
+    if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
+        dialog_ofertas_segmentadas()
 
     uploaded_file = st.file_uploader(
         "Subir base de datos",
@@ -330,13 +273,9 @@ with st.sidebar:
 # --------------------
 # Función de filtrado
 # --------------------
-
 def aplicar_filtros(df, periodo, region, categoria):
-    """Aplica todos los filtros al dataframe"""
     df_filtrado = df.copy()
-    df_filtrado['orden_compra_timestamp'] = pd.to_datetime(
-        df_filtrado['orden_compra_timestamp'], errors='coerce'
-    )
+    df_filtrado['orden_compra_timestamp'] = pd.to_datetime(df_filtrado['orden_compra_timestamp'], errors='coerce')
     df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
 
     if periodo == "Último año":
@@ -347,16 +286,13 @@ def aplicar_filtros(df, periodo, region, categoria):
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
 
     if categoria != "Todas las categorías":
-        df_filtrado = df_filtrado[
-            df_filtrado['categoria_simplificada'] == categoria
-        ]
+        df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
 
     return df_filtrado
 
 # --------------------
 # Lógica principal: mostrar métricas y gráficos
 # --------------------
-
 if 'df' in st.session_state:
     df_filtrado = aplicar_filtros(
         st.session_state['df'],
@@ -374,46 +310,30 @@ if 'df' in st.session_state:
         mes_actual = df_filtrado['mes'].max()
 
         ingresos_totales = df_filtrado['precio_final'].sum()
-        ingresos_año_actual = df_filtrado[
-            df_filtrado['año'] == año_actual
-        ]['precio_final'].sum()
-        ingresos_año_anterior = df_filtrado[
-            df_filtrado['año'] == (año_actual - 1)
-        ]['precio_final'].sum()
+        ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
+        ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
         delta_ingresos = (
             (ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100
             if ingresos_año_anterior > 0 else 0
         )
 
         pedidos_totales = df_filtrado['order_id'].nunique()
-        pedidos_año_actual = df_filtrado[
-            df_filtrado['año'] == año_actual
-        ]['order_id'].nunique()
-        pedidos_año_anterior = df_filtrado[
-            df_filtrado['año'] == (año_actual - 1)
-        ]['order_id'].nunique()
+        pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
+        pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
         delta_pedidos = (
             (pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100
             if pedidos_año_anterior > 0 else 0
         )
 
-        valor_promedio_actual = df_filtrado[
-            df_filtrado['año'] == año_actual
-        ]['precio_final'].mean()
-        valor_promedio_anterior = df_filtrado[
-            df_filtrado['año'] == (año_actual - 1)
-        ]['precio_final'].mean()
+        valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
+        valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
         delta_valor = (
             (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100
             if valor_promedio_anterior > 0 else 0
         )
 
-        flete_promedio_actual = df_filtrado[
-            df_filtrado['año'] == año_actual
-        ]['costo_de_flete'].mean()
-        flete_promedio_anterior = df_filtrado[
-            df_filtrado['año'] == (año_actual - 1)
-        ]['costo_de_flete'].mean()
+        flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
+        flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
         delta_flete = (
             (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100
             if flete_promedio_anterior > 0 else 0
@@ -569,49 +489,142 @@ if 'df' in st.session_state:
         col5, col6 = st.columns(2)
         with col5:
             st.markdown(
-                f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
-                "Ingresos por Región</h5>",
+                f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Mapa de Mesorregiones</h5>",
                 unsafe_allow_html=True
             )
-            ingresos_por_region = df_filtrado.groupby('region')['precio_final'].sum().reset_index()
 
-            fig_reg = px.pie(
-                ingresos_por_region,
-                names='region',
-                values='precio_final',
-                hole=0.5,
-                color_discrete_sequence=["#2F1C6A", "#7B3FF2", "#B39DDB", "#7FC7FF"]
+            # ----------------------------
+            # Construcción del mapa
+            # ----------------------------
+            ingresos_region = df_filtrado.groupby('region')['precio_final'].sum()
+
+            total_ingresos_region = ingresos_region.sum()
+
+            region_percent_map = (ingresos_region / total_ingresos_region * 100).round(1).to_dict()
+
+            all_regions_map = ["Noroeste", "Noreste", "Centro", "Occidente", "Sureste"]
+            for r in all_regions_map:
+                region_percent_map.setdefault(r, 0.0)
+
+            valores_map = [region_percent_map[r] for r in all_regions_map]
+            min_pct_map = min(valores_map)
+            max_pct_map = max(valores_map)
+            rango_map = max_pct_map - min_pct_map if max_pct_map > min_pct_map else 1.0
+
+
+            geojson_url = (
+                "https://gist.githubusercontent.com/walkerke/"
+                "76cb8cc5f949432f9555/raw/"
+                "363c297ce82a4dcb9bdf003d82aa4f64bc695cf1/mx.geojson"
             )
-            fig_reg.update_traces(textinfo='label+percent', textfont_size=14)
-            fig_reg.update_layout(
-                showlegend=True,
-                legend=dict(orientation="v", y=0.5, x=-0.2, font=dict(color="#222")),
-                height=320,
-                margin=dict(l=40, r=20, t=20, b=20),
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF"
-            )
-            st.plotly_chart(fig_reg, use_container_width=True)
-            
+            response = requests.get(geojson_url)
+            mexico_geo = response.json()
+
+            region_mapping_map = {
+                "Baja California": "Noroeste",
+                "Baja California Sur": "Noroeste",
+                "Sinaloa": "Noroeste",
+                "Sonora": "Noroeste",
+                "Chihuahua": "Noreste",
+                "Durango": "Noreste",
+                "Coahuila": "Noreste",
+                "Nuevo León": "Noreste",
+                "Tamaulipas": "Noreste",
+                "Hidalgo": "Centro",
+                "Puebla": "Centro",
+                "Tlaxcala": "Centro",
+                "Querétaro": "Centro",
+                "Ciudad de México": "Centro",
+                "México": "Centro",
+                "Morelos": "Centro",
+                "Aguascalientes": "Occidente",
+                "Guanajuato": "Occidente",
+                "San Luis Potosí": "Occidente",
+                "Zacatecas": "Occidente",
+                "Colima": "Occidente",
+                "Jalisco": "Occidente",
+                "Michoacán": "Occidente",
+                "Nayarit": "Occidente",
+                "Campeche": "Sureste",
+                "Quintana Roo": "Sureste",
+                "Tabasco": "Sureste",
+                "Veracruz": "Sureste",
+                "Yucatán": "Sureste",
+                "Chiapas": "Sureste",
+                "Guerrero": "Sureste",
+                "Oaxaca": "Sureste",
+            }
+
+            for feature in mexico_geo["features"]:
+                estado_geo = feature["properties"]["name"]
+                meso_geo = region_mapping_map.get(estado_geo)
+                pct_geo = region_percent_map.get(meso_geo, 0.0)
+                ingresos_geo = ingresos_region.get(meso_geo, 0.0) 
+
+                if meso_geo is None:
+                    feature["properties"]["region"] = "Sin datos"
+                    feature["properties"]["percent_label"] = "0%"
+                    feature["properties"]["ingresos"] = 0.0
+                else:
+                    feature["properties"]["region"] = meso_geo
+                    feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
+                    feature["properties"]["ingresos"] = ingresos_geo
+
+            def style_function(feature):
+                meso_feat = feature["properties"].get("region", "")
+                label_feat = feature["properties"].get("percent_label", "0%")
+                try:
+                    pct_feat = float(label_feat.rstrip("%"))
+                except (ValueError, AttributeError):
+                    pct_feat = 0.0
+
+                if meso_feat not in all_regions_map:
+                    return {
+                        "fillColor": "#D3D3D3",
+                        "color": "black",
+                        "weight": 1,
+                        "fillOpacity": 0.4,
+                    }
+
+                intensidad_relatif = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
+                intensidad_relatif = max(min(intensidad_relatif, 1.0), 0.0)
+                intensidad_final_map = 0.30 + 0.70 * intensidad_relatif
+                intensidad_final_map = max(min(intensidad_final_map, 1.0), 0.30)
+                pct_for_blend = intensidad_final_map * 100.0
+
+                fill_color_hex = blend_with_white(BASE_RGB, pct_for_blend)
+
+                return {
+                    "fillColor": fill_color_hex,
+                    "color": "black",
+                    "weight": 1,
+                    "fillOpacity": 0.8,
+                }
+            m = folium.Map(location=[23.0, -102.0], zoom_start=5, tiles="cartodbpositron")
+            folium.GeoJson(
+                data=mexico_geo,
+                style_function=style_function,
+                tooltip=folium.GeoJsonTooltip(
+                    fields=["region", "ingresos", "percent_label"], 
+                    aliases=["Región:", "Ingresos totales:", "Porcentaje de ingresos:"],  
+                    localize=True,
+                    sticky=False
+                ),
+            ).add_to(m)
+
+            # <-- En lugar de st_folium, insertamos el HTML puro -->
+            map_html = m.get_root().render()
+            components.html(map_html, height=400, width=700)
+
         with col6:
             st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
 
             categorias = df_filtrado['categoria_simplificada'].unique()
 
-            # Genera colores aleatorios en formato hexadecimal
             colores_random = [
-                "#b39ddb",  # lavanda
-                "#c5cae9",  # azul pastel
-                "#9fa8da",  # azul violeta
-                "#ce93d8",  # rosa lavanda
-                "#90caf9",  # celeste pastel
-                "#f48fb1",  # rosa claro
-                "#a5d6a7",  # verde suave
-                "#9575cd",  # violeta
-                "#81d4fa",  # celeste
-                "#cfd8dc",  # gris pastel
-                "#e1bee7",  # rosa lavanda
-                "#b3e5fc"   # azul claro pastel
+                "#b39ddb",  "#c5cae9",  "#9fa8da",  "#ce93d8",
+                "#90caf9",  "#f48fb1",  "#a5d6a7",  "#9575cd",
+                "#81d4fa",  "#cfd8dc",  "#e1bee7",  "#b3e5fc"
             ][:len(categorias)]
 
             bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
@@ -639,10 +652,9 @@ if 'df' in st.session_state:
                         sizemode='area',
                         sizeref=sizeref,
                         sizemin=8,
-                        opacity=0.5,  # <- transparencia suave
-                        line=dict(width=1, color="rgba(0,0,0,0.1)")  # borde sutil
+                        opacity=0.5,
+                        line=dict(width=1, color="rgba(0,0,0,0.1)")
                     ),
-
                     name=row['Categoría'],
                     hovertemplate=f"<b>{row['Categoría']}</b><br>Costo de Flete: {row['Costo de Flete']:.2f}<br>Precio Final: {row['Precio Final']:.2f}<br>Peso Volumétrico (kg): {row['Peso Volumétrico (kg)']:.2f}<extra></extra>",
                     visible=True
@@ -657,30 +669,20 @@ if 'df' in st.session_state:
                 paper_bgcolor="#FFF",
                 margin=dict(l=20, r=20, t=30, b=20),
                 legend=dict(orientation="v", y=0.5, x=1.1),
-                updatemenus=[
-                    dict(
-                        type="buttons",
-                        direction="left",
-                        buttons=[
-                            dict(
-                                args=[{"visible": visible_legendonly}],
-                                label="❌ Quitar todas",
-                                method="restyle"
-                            ),
-                            dict(
-                                args=[{"visible": visible_true}],
-                                label="✅ Mostrar todas",
-                                method="restyle"
-                            )
-                        ],
-                        pad={"r": 10, "t": 10},
-                        showactive=False,
-                        x=0,
-                        xanchor="left",
-                        y=1.15,
-                        yanchor="top"
-                    )
-                ]
+                updatemenus=[{
+                    'type': "buttons",
+                    'direction': "left",
+                    'buttons': [
+                        {'args': [{"visible": visible_legendonly}], 'label': "❌ Quitar todas", 'method': "restyle"},
+                        {'args': [{"visible": visible_true}],    'label': "✅ Mostrar todas", 'method': "restyle"}
+                    ],
+                    'pad': {"r": 10, "t": 10},
+                    'showactive': False,
+                    'x': 0,
+                    'xanchor': "left",
+                    'y': 1.15,
+                    'yanchor': "top"
+                }]
             )
 
             st.plotly_chart(fig_bub, use_container_width=True)
@@ -689,10 +691,8 @@ else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
 
     col1, col2, col3, col4 = st.columns(4)
-    for col, label in zip(
-        [col1, col2, col3, col4],
-        ["Ingresos Totales", "Pedidos Totales", "Valor Promedio", "Flete Promedio"]
-    ):
+    for col, label in zip([col1, col2, col3, col4],
+                          ["Ingresos Totales", "Pedidos Totales", "Valor Promedio", "Flete Promedio"]):
         with col:
             st.markdown(
                 f"""<div class="kpi-card">
@@ -727,23 +727,26 @@ else:
     with col5:
         st.markdown(
             f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>"
-            "Ingresos por Región</h5>",
+            "Mapa de Ingresos por Region</h5>",
             unsafe_allow_html=True
         )
-        fig_placeholder2 = px.pie(values=[], names=[])
-        fig_placeholder2.update_layout(
-            annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
-            showlegend=False,
-            height=320
+        # Mapa en estado 'sin datos'
+        fig_empty_map = px.scatter_mapbox(pd.DataFrame({'lat': [], 'lon': []}), lat='lat', lon='lon')
+        fig_empty_map.update_layout(
+            mapbox={'style': "open-street-map", 'zoom': 4, 'center': {'lat': 23.0, 'lon': -102.0}},
+            height=400,
+            margin=dict(l=0, r=0, t=0, b=0)
         )
-        st.plotly_chart(fig_placeholder2, use_container_width=True)
+        st.plotly_chart(fig_empty_map, use_container_width=True)
 
     with col6:
         st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
-        fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
-        fig_placeholder3.update_layout(
+        fig_placeholder_bubble = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+        fig_placeholder_bubble.update_layout(
+            height=320,
+            plot_bgcolor="#FFF",
+            paper_bgcolor="#FFF",
             annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
-            showlegend=False,
-            height=320
+            showlegend=False
         )
-        st.plotly_chart(fig_placeholder3, use_container_width=True)
+        st.plotly_chart(fig_placeholder_bubble, use_container_width=True)
