@@ -898,72 +898,26 @@ with tab1:
                     hovertemplate="<b>%{customdata}</b><br>Costo: %{y:.2f}<extra></extra>"
                 ))
 
-            visible_legendonly = ['legendonly'] * len(categorias)
-            visible_true = [True] * len(categorias)
-
-            fig_bub.update_layout(
-                height=450,
-                width=2000,
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF",
-                margin=dict(l=20, r=20, t=30, b=20),
-                xaxis=dict(
-                    title=dict(
-                        text="Costo de Flete",
-                        font=dict(size=17, color="#222")
+                fig_bar.update_layout(
+                    height=400,
+                    plot_bgcolor="#FFF",
+                    paper_bgcolor="#FFF",
+                    margin=dict(l=20, r=20, t=30, b=100),
+                    xaxis=dict(
+                        title=None,
+                        tickfont=dict(size=14, color="#222"),
+                        tickangle=-45
                     ),
-                    tickfont=dict(
-                        size=15,
-                        color="#222"
+                    yaxis=dict(
+                        title=None,
+                        showgrid=True,
+                        gridcolor="#b0b0b0",
+                        gridwidth=1,
+                        tickfont=dict(size=15, color="#222")
                     )
-                ),
-                yaxis=dict(
-                    showgrid=True,  # Movido fuera de title
-                    gridcolor="#b0b0b0",  # Gris oscuro
-                    gridwidth=1,  # Más grueso
-                    title=dict(
-                        text="Ingresos",
-                        font=dict(size=17, family="sans-serif", color="#222")
-                    ),
-                    tickfont=dict(
-                        size=15,
-                        family="sans-serif",
-                        color="#222"
-                    )
-                ),
-                legend=dict(  # Movido fuera de yaxis
-                    orientation="v",
-                    y=0.5,
-                    x=1.1,
-                    font=dict(size=17, family="sans-serif", color="#222")
-                ),
-                updatemenus=[  # Movido fuera de yaxis
-                    dict(
-                        type="buttons",
-                        direction="left",
-                        buttons=[
-                            dict(
-                                args=[{"visible": visible_legendonly}],
-                                label="❌ Quitar todas",
-                                method="restyle"
-                            ),
-                            dict(
-                                args=[{"visible": visible_true}],
-                                label="✅ Mostrar todas",
-                                method="restyle"
-                            )
-                        ],
-                        pad={"r": 10, "t": 10},
-                        showactive=False,
-                        x=0,
-                        xanchor="left",
-                        y=1.15,
-                        yanchor="top"
-                    )
-                ]
-            )
+                )
 
-            st.plotly_chart(fig_bub, use_container_width=True)
+                st.plotly_chart(fig_bar, use_container_width=True)
             
             st.markdown("""
             <style>
