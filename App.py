@@ -106,6 +106,14 @@ st.markdown(f"""
         width: 400px !important;
     }}
 
+    /* ========== TEXTO MÁS GRANDE EN TÍTULOS DE FILTROS ========== */
+    section[data-testid="stSidebar"] label {{
+        font-size: 3.5rem !important;
+        font-weight: 600 !important;
+        color: {COLOR_PRIMARY} !important;
+        margin-bottom: 6px !important;
+    }}
+
     section[data-testid="stSidebar"] .stMarkdown {{
         font-size: 1.2rem !important;
     }}
@@ -144,13 +152,6 @@ st.markdown(f"""
         width: 20px !important;
         height: 20px !important;
         color: {COLOR_PRIMARY} !important;
-    }}
-
-    section[data-testid="stSidebar"] .stSelectbox label {{
-        font-size: 1.25rem !important;
-        font-weight: 400 !important;
-        color: {COLOR_PRIMARY} !important;
-        margin-bottom: 8px !important;
     }}
 
     /* ========== RECOMENDACIONES ========== */
@@ -249,6 +250,8 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
+
+
 # --------------------
 # Sidebar con filtros y recomendaciones
 # --------------------
@@ -335,7 +338,7 @@ with st.sidebar:
                 df = pd.read_parquet(uploaded_file)
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python')
-            df.to_excel("df_DataBridgeConsulting.xlsx", index=False)
+            df.to_parquet("df_DataBridgeConsulting.parquet", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
 
@@ -344,14 +347,14 @@ with st.sidebar:
                 capture_output=True,
                 text=True
             )
-
+            
             if resultado.returncode == 0:
                 st.success("✅ Modelo ejecutado correctamente")
                 st.text("Salida del modelo:")
                 st.code(resultado.stdout, language='bash')
             else:
-                st.error("❌ Error al ejecutar el modelo")
-                st.text("Detalles del error:")
+                #st.error("❌ Error al ejecutar el modelo")
+                #st.text("Detalles del error:")
                 st.code(resultado.stderr, language='bash')
 
             if os.path.exists("prediccion_mes_siguiente.csv"):
@@ -537,20 +540,23 @@ if 'df' in st.session_state:
 
         fig_tendencia = go.Figure()
         df_real = df_total[df_total["Tipo"] == "real"]
-        fig_tendencia.add_trace(go.Scatter(
-            x=df_real["MesIndex"],
-            y=df_real["precio_final"],
-            mode='lines+markers',
-            name='Datos reales',
-            line=dict(color="#3B82F6", width=3),
-            marker=dict(size=8, color="#3B82F6")
-        ))
-
         df_pred_plot = df_total[df_total["Tipo"] == "pred"]
-        if not df_pred_plot.empty:
-            df_pred_union = df_pred_plot.copy()
-            df_pred_union.loc[df_pred_union.index[0], "precio_final"] = None
 
+        fig_tendencia = go.Figure()
+
+        # Línea de datos reales
+        if not df_real.empty:
+            fig_tendencia.add_trace(go.Scatter(
+                x=df_real["MesIndex"],
+                y=df_real["precio_final"],
+                mode='lines+markers',
+                name='Datos reales',
+                line=dict(color="#3B82F6", width=3),
+                marker=dict(size=8, color="#3B82F6")
+            ))
+
+        # Línea de predicción solo si hay predicción y datos reales
+        if not df_pred_plot.empty and not df_real.empty:
             fig_tendencia.add_trace(go.Scatter(
                 x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
                 y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
@@ -576,8 +582,9 @@ if 'df' in st.session_state:
                 bgcolor="#FFF",
                 bordercolor="#111",
                 borderwidth=3,
-                arrowcolor="#111"    # Color fuerte para la flecha
+                arrowcolor="#111"
             )
+
 
         fig_tendencia.update_layout(
             height=500,

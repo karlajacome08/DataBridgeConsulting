@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 try:
-    df = pd.read_excel("df_DataBridgeConsulting.xlsx")
+    df = pd.read_parquet("df_DataBridgeConsulting.parquet")
 except Exception as e:
     print("Error:", e)
 df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'])
