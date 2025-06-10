@@ -96,10 +96,19 @@ def dialog_ofertas_segmentadas():
 # --------------------------------------
 # 3. Configuración de la página y estilos
 # --------------------------------------
-st.set_page_config(page_title="Panel de Entregas", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Ingresos y Proyecciones", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st.markdown(f"""
     <style>
+    /* ========== GENERAL ========== */
+           
+    div.block-container {{
+        padding-top: 0rem !important;
+    }}
+    div.stApp {{
+        padding-top: 0rem !important;
+    }}
+            
     /* ========== SIDEBAR GENERAL ========== */
     section[data-testid="stSidebar"] {{
         background-color: {COLOR_BG};
@@ -175,6 +184,24 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
+    /* ========== TABS ========== */
+
+    div[data-testid="stTabs"] [role="tablist"] > div:last-child {{
+        display: none !important;
+    }}
+
+    div[data-testid="stTabs"] [role="tab"] {{
+        color: #666666 !important;           /* color inactivo */
+        font-size: 1.25rem !important;
+        font-weight: 500 !important;
+        padding: 0.75rem 1.5rem !important;
+    }}
+
+    div[data-testid="stTabs"] [role="tab"][aria-selected="true"] {{
+        color: #0E2148 !important;
+        border-bottom: 3px solid #0E2148 !important;
+    }}
+
     /* ========== FILE UPLOADER ========== */
     section[data-testid="stSidebar"] .stFileUploader {{
         border: 2.5px dashed {COLOR_PRIMARY} !important;
@@ -205,6 +232,7 @@ st.markdown(f"""
         justify-content: center;
         text-align: center;
         box-sizing: border-box;
+        margin-top:1.5rem;
     }}
 
     .kpi-label {{
@@ -249,6 +277,13 @@ st.markdown(f"""
     }}
     </style>
 """, unsafe_allow_html=True)
+
+st.markdown(
+        "<h1 style='text-align:start; color:#0E2148; margin-top:1.5rem;'>"
+        "Ingresos y Proyecciones"
+        "</h1>",
+        unsafe_allow_html=True
+        )
 
 
 
@@ -393,254 +428,483 @@ def aplicar_filtros(df, periodo, region, categoria):
 # --------------------
 # Lógica principal: mostrar métricas y gráficos
 # --------------------
-if 'df' in st.session_state:
-    df_filtrado = aplicar_filtros(
-        st.session_state['df'],
-        periodo_sel,
-        region_sel,
-        categoria_sel
-    )
-
-    if len(df_filtrado) > 0:
-        df_filtrado['año'] = df_filtrado['orden_compra_timestamp'].dt.year
-        df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
-        df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
-
-        año_actual = df_filtrado['año'].max()
-        mes_actual = df_filtrado['mes'].max()
-
-        ingresos_totales = df_filtrado['precio_final'].sum()
-        ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
-        ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
-        delta_ingresos = (
-            (ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100
-            if ingresos_año_anterior > 0 else 0
+tab1, tab2 = st.tabs(["Tablero", "Otro Tab"])
+with tab1:
+    if 'df' in st.session_state:
+        df_filtrado = aplicar_filtros(
+            st.session_state['df'],
+            periodo_sel,
+            region_sel,
+            categoria_sel
         )
 
-        pedidos_totales = df_filtrado['order_id'].nunique()
-        pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
-        pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
-        delta_pedidos = (
-            (pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100
-            if pedidos_año_anterior > 0 else 0
-        )
+        if len(df_filtrado) > 0:
+            df_filtrado['año'] = df_filtrado['orden_compra_timestamp'].dt.year
+            df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+            df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
 
-        valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
-        valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
-        delta_valor = (
-            (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100
-            if valor_promedio_anterior > 0 else 0
-        )
+            año_actual = df_filtrado['año'].max()
+            mes_actual = df_filtrado['mes'].max()
 
-        flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
-        flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
-        delta_flete = (
-            (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100
-            if flete_promedio_anterior > 0 else 0
-        )
+            ingresos_totales = df_filtrado['precio_final'].sum()
+            ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
+            ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
+            delta_ingresos = (
+                (ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100
+                if ingresos_año_anterior > 0 else 0
+            )
 
-        # KPI Cards
+            pedidos_totales = df_filtrado['order_id'].nunique()
+            pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
+            pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
+            delta_pedidos = (
+                (pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100
+                if pedidos_año_anterior > 0 else 0
+            )
+
+            valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
+            valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
+            delta_valor = (
+                (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100
+                if valor_promedio_anterior > 0 else 0
+            )
+
+            flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
+            flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
+            delta_flete = (
+                (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100
+                if flete_promedio_anterior > 0 else 0
+            )
+
+            # KPI Cards
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
+                flecha = "↑" if delta_ingresos >= 0 else "↓"
+                st.markdown(
+                    f"""<div class="kpi-card">
+                            <div class="kpi-label">🏦 Ingresos Totales</div>
+                            <div class="kpi-value-row">
+                                <div class="kpi-value">${ingresos_totales:,.0f}</div>
+                                <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
+                            </div>
+                            <div class="kpi-subtext">vs año anterior</div>
+                        </div>""",
+                    unsafe_allow_html=True
+                )
+
+            with col2:
+                color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
+                flecha = "↑" if delta_pedidos >= 0 else "↓"
+                st.markdown(
+                    f"""<div class="kpi-card">
+                            <div class="kpi-label">📦 Pedidos Totales</div>
+                            <div class="kpi-value-row">
+                                <div class="kpi-value">{pedidos_totales:,}</div>
+                                <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
+                            </div>
+                            <div class="kpi-subtext">vs año anterior</div>
+                        </div>""",
+                    unsafe_allow_html=True
+                )
+
+            with col3:
+                color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
+                flecha = "↑" if delta_valor >= 0 else "↓"
+                st.markdown(
+                    f"""<div class="kpi-card">
+                            <div class="kpi-label">💵 Valor Promedio</div>
+                            <div class="kpi-value-row">
+                                <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
+                                <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
+                            </div>
+                            <div class="kpi-subtext">vs año anterior</div>
+                        </div>""",
+                    unsafe_allow_html=True
+                )
+
+            with col4:
+                color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
+                flecha = "↑" if delta_flete >= 0 else "↓"
+                st.markdown(
+                    f"""<div class="kpi-card">
+                            <div class="kpi-label">🚚 Flete Promedio</div>
+                            <div class="kpi-value-row">
+                                <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
+                                <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
+                            </div>
+                            <div class="kpi-subtext">vs año anterior</div>
+                        </div>""",
+                    unsafe_allow_html=True
+                )
+
+            st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+            # Gráfico de Tendencia Mensual
+            st.markdown(
+                f"<h4 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+                "Tendencia de Ingresos Mensuales</h4>",
+                unsafe_allow_html=True
+            )
+            df_filtrado['Año'] = df_filtrado['orden_compra_timestamp'].dt.year
+            df_filtrado['Mes'] = df_filtrado['orden_compra_timestamp'].dt.month
+            df_filtrado['Dia'] = df_filtrado['orden_compra_timestamp'].dt.day
+
+            dias_por_mes = df_filtrado.groupby(['Año', 'Mes'])['Dia'].nunique().reset_index()
+            dias_por_mes.rename(columns={'Dia': 'DiasRegistrados'}, inplace=True)
+
+            if (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías"):
+                MIN_DIAS_MES = 28
+                meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
+            else:
+                # Tomar todos los meses sin filtrar por días
+                meses_validos = dias_por_mes[['Año', 'Mes']]
+
+            df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
+            df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
+            df_mensual['Tipo'] = "real"
+
+            if not df_pred.empty:
+                df_pred_plot_total = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
+                df_total = pd.concat([df_mensual, df_pred_plot_total], ignore_index=True)
+            else:
+                df_total = df_mensual
+
+            df_total = df_total.sort_values(["Año", "Mes"]).reset_index(drop=True)
+            df_total["MesAbrev"] = df_total["Mes"].apply(lambda x: calendar.month_abbr[x])
+            df_total["MesIndex"] = (
+                df_total["Año"].astype(str) + "-" + df_total["Mes"].astype(str).str.zfill(2)
+            )
+
+            fig_tendencia = go.Figure()
+            df_real = df_total[df_total["Tipo"] == "real"]
+            df_pred_plot = df_total[df_total["Tipo"] == "pred"]
+
+            fig_tendencia = go.Figure()
+
+            # Línea de datos reales
+            if not df_real.empty:
+                fig_tendencia.add_trace(go.Scatter(
+                    x=df_real["MesIndex"],
+                    y=df_real["precio_final"],
+                    mode='lines+markers',
+                    name='Datos reales',
+                    line=dict(color="#3B82F6", width=3),
+                    marker=dict(size=8, color="#3B82F6")
+                ))
+
+            # Línea de predicción solo si hay predicción y datos reales
+            # Solo mostrar la línea de predicción si los filtros están en "Todas"
+            mostrar_prediccion = (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías")
+            
+            if mostrar_prediccion and not df_pred_plot.empty and not df_real.empty:
+                fig_tendencia.add_trace(go.Scatter(
+                    x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
+                    y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
+                    mode='lines+markers',
+                    name='Predicción mes siguiente',
+                    line=dict(color='#555555', width=4, dash='dot'),
+                    marker=dict(
+                        size=[0] + [14] * len(df_pred_plot),
+                        color=['#7B3FF2'] + ['#555555'] * len(df_pred_plot)
+                    )
+                ))
+
+                pred_mes = df_pred_plot.iloc[0]
+                fig_tendencia.add_annotation(
+                    x=pred_mes["MesIndex"],
+                    y=pred_mes["precio_final"],
+                    text="Mes Predicho",
+                    showarrow=True,
+                    arrowhead=1,
+                    ax=0,
+                    ay=-40,
+                    font=dict(color="#333333", size=14, family="sans-serif"),
+                    bgcolor="#FFF",
+                    bordercolor="#111",
+                    borderwidth=3,
+                    arrowcolor="#111"
+                )
+
+
+            fig_tendencia.update_layout(
+                height=500,
+                plot_bgcolor="#FFF",
+                paper_bgcolor="#FFF",
+                margin=dict(l=20, r=20, t=30, b=20),
+                font=dict(family="sans-serif", color="#222"),
+                xaxis=dict(
+                    title=None,
+                    showgrid=False,
+                    zeroline=False,
+                    tickmode='array',
+                    tickvals=df_total["MesIndex"],
+                    ticktext=[row['MesAbrev'] for _, row in df_total.iterrows()],
+                    tickfont=dict(
+                        size=18,  # Más grande
+                        family="sans-serif",
+                        color="#222",
+                    )
+                ),
+                yaxis=dict(
+                    title=None,
+                    showgrid=True,
+                    gridcolor="#b0b0b0",
+                    gridwidth=2,          # Más grueso
+                    rangemode="tozero",
+                    tickfont=dict(
+                        size=18,  # Más grande
+                        family="sans-serif",
+                        color="#222",
+                    )
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1,
+                    font = dict (
+                        size = 16,
+                        family="sans-serif",
+                        color="#222"
+                    )
+                )
+            )
+
+            st.plotly_chart(fig_tendencia, use_container_width=True)
+
+            # Gráficos por Región y Categoría
+            col5, col6 = st.columns(2)
+            with col5:
+                st.markdown(
+                    f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+                    "Ingresos por Región</h5>",
+                    unsafe_allow_html=True
+                )
+
+                # ----------------------------
+                # Construcción del mapa
+                # ----------------------------
+                ingresos_region = df_filtrado.groupby('region')['precio_final'].sum()
+
+                total_ingresos_region = ingresos_region.sum()
+
+                region_percent_map = (ingresos_region / total_ingresos_region * 100).round(1).to_dict()
+
+                all_regions_map = ["Noroeste", "Noreste", "Centro", "Occidente", "Sureste"]
+                for r in all_regions_map:
+                    region_percent_map.setdefault(r, 0.0)
+
+                valores_map = [region_percent_map[r] for r in all_regions_map]
+                min_pct_map = min(valores_map)
+                max_pct_map = max(valores_map)
+                rango_map = max_pct_map - min_pct_map if max_pct_map > min_pct_map else 1.0
+
+
+                geojson_url = (
+                    "https://gist.githubusercontent.com/walkerke/"
+                    "76cb8cc5f949432f9555/raw/"
+                    "363c297ce82a4dcb9bdf003d82aa4f64bc695cf1/mx.geojson"
+                )
+                response = requests.get(geojson_url)
+                mexico_geo = response.json()
+
+                region_mapping_map = {
+                    "Baja California": "Noroeste",
+                    "Baja California Sur": "Noroeste",
+                    "Sinaloa": "Noroeste",
+                    "Sonora": "Noroeste",
+                    "Chihuahua": "Noreste",
+                    "Durango": "Noreste",
+                    "Coahuila": "Noreste",
+                    "Nuevo León": "Noreste",
+                    "Tamaulipas": "Noreste",
+                    "Hidalgo": "Centro",
+                    "Puebla": "Centro",
+                    "Tlaxcala": "Centro",
+                    "Querétaro": "Centro",
+                    "Ciudad de México": "Centro",
+                    "México": "Centro",
+                    "Morelos": "Centro",
+                    "Aguascalientes": "Occidente",
+                    "Guanajuato": "Occidente",
+                    "San Luis Potosí": "Occidente",
+                    "Zacatecas": "Occidente",
+                    "Colima": "Occidente",
+                    "Jalisco": "Occidente",
+                    "Michoacán": "Occidente",
+                    "Nayarit": "Occidente",
+                    "Campeche": "Sureste",
+                    "Quintana Roo": "Sureste",
+                    "Tabasco": "Sureste",
+                    "Veracruz": "Sureste",
+                    "Yucatán": "Sureste",
+                    "Chiapas": "Sureste",
+                    "Guerrero": "Sureste",
+                    "Oaxaca": "Sureste",
+                }
+
+                for feature in mexico_geo["features"]:
+                    estado_geo = feature["properties"]["name"]
+                    meso_geo = region_mapping_map.get(estado_geo)
+                    pct_geo = region_percent_map.get(meso_geo, 0.0)
+                    ingresos_geo = ingresos_region.get(meso_geo, 0.0) 
+
+                    if meso_geo is None:
+                        feature["properties"]["region"] = "Sin datos"
+                        feature["properties"]["percent_label"] = "0%"
+                        feature["properties"]["ingresos"] = 0.0
+                    else:
+                        feature["properties"]["region"] = meso_geo
+                        feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
+                        feature["properties"]["ingresos"] = ingresos_geo
+
+                def style_function(feature):
+                    meso_feat = feature["properties"].get("region", "")
+                    label_feat = feature["properties"].get("percent_label", "0%")
+                    try:
+                        pct_feat = float(label_feat.rstrip("%"))
+                    except (ValueError, AttributeError):
+                        pct_feat = 0.0
+
+                    if meso_feat not in all_regions_map:
+                        return {
+                            "fillColor": "#D3D3D3",
+                            "color": "black",
+                            "weight": 1,
+                            "fillOpacity": 0.4,
+                        }
+
+                    intensidad_relatif = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
+                    intensidad_relatif = max(min(intensidad_relatif, 1.0), 0.0)
+                    intensidad_final_map = 0.30 + 0.70 * intensidad_relatif
+                    intensidad_final_map = max(min(intensidad_final_map, 1.0), 0.30)
+                    pct_for_blend = intensidad_final_map * 100.0
+
+                    fill_color_hex = blend_with_white(BASE_RGB, pct_for_blend)
+
+                    return {
+                        "fillColor": fill_color_hex,
+                        "color": "black",
+                        "weight": 1,
+                        "fillOpacity": 0.8,
+                    }
+                m = folium.Map(location=[23.0, -102.0], zoom_start=5, tiles="cartodbpositron")
+                folium.GeoJson(
+                    data=mexico_geo,
+                    style_function=style_function,
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=["region", "ingresos", "percent_label"], 
+                        aliases=["Región:", "Ingresos totales:", "Porcentaje de ingresos:"],  
+                        localize=True,
+                        sticky=False
+                    ),
+                ).add_to(m)
+
+                # <-- En lugar de st_folium, insertamos el HTML puro -->
+                map_html = m.get_root().render()
+                components.html(map_html, height=400, width=1200)
+
+            with col6:
+                st.markdown(
+                    f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+                    "Costos Operativos</h5>",
+                    unsafe_allow_html=True
+                )
+
+                # Preparamos los datos (siempre de mayor a menor)
+                bar_data = (
+                    df_filtrado
+                    .groupby('categoria_simplificada')['costo_de_flete']
+                    .mean()
+                    .reset_index()
+                    .rename(columns={
+                        'categoria_simplificada': 'Categoría',
+                        'costo_de_flete': 'Costo Promedio de Flete'
+                    })
+                    .sort_values('Costo Promedio de Flete', ascending=False)
+                    .reset_index(drop=True)
+                )
+
+                # Generamos colores: top 3 resaltadas
+                highlight_color = "#5409DA"
+                default_color   = "#7965C1"
+                colors = [
+                    highlight_color if idx < 3 else default_color
+                    for idx in range(len(bar_data))
+                ]
+
+                # Creamos el gráfico de barras vertical
+                fig_bar = go.Figure(go.Bar(
+                    x=bar_data['Categoría'],
+                    y=bar_data['Costo Promedio de Flete'],
+                    marker=dict(color=colors),
+                    text=bar_data['Costo Promedio de Flete'].map(lambda v: f"${v:.2f}"),
+                    textposition='outside',
+                    hovertemplate="<b>%{x}</b><br>Costo: %{y:.2f}<extra></extra>"
+                ))
+
+                fig_bar.update_layout(
+                    height=400,
+                    plot_bgcolor="#FFF",
+                    paper_bgcolor="#FFF",
+                    margin=dict(l=20, r=20, t=30, b=100),
+                    xaxis=dict(
+                        title=None,
+                        tickfont=dict(size=15, color="#222"),
+                        tickangle=-45
+                    ),
+                    yaxis=dict(
+                        title=None,
+                        showgrid=True,
+                        gridcolor="#b0b0b0",
+                        gridwidth=1,
+                        tickfont=dict(size=15, color="#222")
+                    )
+                )
+
+                st.plotly_chart(fig_bar, use_container_width=True)
+
+    else:
+        st.info("Sube tu base de datos para ver las métricas filtradas")
+
         col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
-            flecha = "↑" if delta_ingresos >= 0 else "↓"
-            st.markdown(
-                f"""<div class="kpi-card">
-                        <div class="kpi-label">🏦 Ingresos Totales</div>
-                        <div class="kpi-value-row">
-                            <div class="kpi-value">${ingresos_totales:,.0f}</div>
-                            <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
-                        </div>
-                        <div class="kpi-subtext">vs año anterior</div>
-                    </div>""",
-                unsafe_allow_html=True
-            )
-
-        with col2:
-            color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
-            flecha = "↑" if delta_pedidos >= 0 else "↓"
-            st.markdown(
-                f"""<div class="kpi-card">
-                        <div class="kpi-label">📦 Pedidos Totales</div>
-                        <div class="kpi-value-row">
-                            <div class="kpi-value">{pedidos_totales:,}</div>
-                            <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
-                        </div>
-                        <div class="kpi-subtext">vs año anterior</div>
-                    </div>""",
-                unsafe_allow_html=True
-            )
-
-        with col3:
-            color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
-            flecha = "↑" if delta_valor >= 0 else "↓"
-            st.markdown(
-                f"""<div class="kpi-card">
-                        <div class="kpi-label">💵 Valor Promedio</div>
-                        <div class="kpi-value-row">
-                            <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
-                            <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
-                        </div>
-                        <div class="kpi-subtext">vs año anterior</div>
-                    </div>""",
-                unsafe_allow_html=True
-            )
-
-        with col4:
-            color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
-            flecha = "↑" if delta_flete >= 0 else "↓"
-            st.markdown(
-                f"""<div class="kpi-card">
-                        <div class="kpi-label">🚚 Flete Promedio</div>
-                        <div class="kpi-value-row">
-                            <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
-                            <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
-                        </div>
-                        <div class="kpi-subtext">vs año anterior</div>
-                    </div>""",
-                unsafe_allow_html=True
-            )
+        for col, label in zip(
+            [col1, col2, col3, col4],
+            ["🏦 Ingresos Totales", "📦 Pedidos Totales", "💵 Valor Promedio", "🚚 Flete Promedio"]
+        ):
+            with col:
+                st.markdown(
+                    f"""<div class="kpi-card">
+                            <div class="kpi-label">{label}</div>
+                            <div class="kpi-value" style="color:#DDD;">---</div>
+                            <div class="kpi-subtext" style="color:#DDD;">Sin datos</div>
+                        </div>""",
+                    unsafe_allow_html=True
+                )
 
         st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-
-
-        # Gráfico de Tendencia Mensual
         st.markdown(
-            f"<h4 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
+            f"<h4 style='color:{COLOR_PRIMARY};font-size:1.75rem; margin-bottom:0.5rem;'>"
             "Tendencia de Ingresos Mensuales</h4>",
             unsafe_allow_html=True
         )
-        df_filtrado['Año'] = df_filtrado['orden_compra_timestamp'].dt.year
-        df_filtrado['Mes'] = df_filtrado['orden_compra_timestamp'].dt.month
-        df_filtrado['Dia'] = df_filtrado['orden_compra_timestamp'].dt.day
-
-        dias_por_mes = df_filtrado.groupby(['Año', 'Mes'])['Dia'].nunique().reset_index()
-        dias_por_mes.rename(columns={'Dia': 'DiasRegistrados'}, inplace=True)
-
-        if (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías"):
-            MIN_DIAS_MES = 28
-            meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
-        else:
-            # Tomar todos los meses sin filtrar por días
-            meses_validos = dias_por_mes[['Año', 'Mes']]
-
-        df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
-        df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
-        df_mensual['Tipo'] = "real"
-
-        if not df_pred.empty:
-            df_pred_plot_total = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
-            df_total = pd.concat([df_mensual, df_pred_plot_total], ignore_index=True)
-        else:
-            df_total = df_mensual
-
-        df_total = df_total.sort_values(["Año", "Mes"]).reset_index(drop=True)
-        df_total["MesAbrev"] = df_total["Mes"].apply(lambda x: calendar.month_abbr[x])
-        df_total["MesIndex"] = (
-            df_total["Año"].astype(str) + "-" + df_total["Mes"].astype(str).str.zfill(2)
-        )
-
-        fig_tendencia = go.Figure()
-        df_real = df_total[df_total["Tipo"] == "real"]
-        df_pred_plot = df_total[df_total["Tipo"] == "pred"]
-
-        fig_tendencia = go.Figure()
-
-        # Línea de datos reales
-        if not df_real.empty:
-            fig_tendencia.add_trace(go.Scatter(
-                x=df_real["MesIndex"],
-                y=df_real["precio_final"],
-                mode='lines+markers',
-                name='Datos reales',
-                line=dict(color="#3B82F6", width=3),
-                marker=dict(size=8, color="#3B82F6")
-            ))
-
-        # Línea de predicción solo si hay predicción y datos reales
-        # Solo mostrar la línea de predicción si los filtros están en "Todas"
-        mostrar_prediccion = (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías")
-        
-        if mostrar_prediccion and not df_pred_plot.empty and not df_real.empty:
-            fig_tendencia.add_trace(go.Scatter(
-                x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
-                y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
-                mode='lines+markers',
-                name='Predicción mes siguiente',
-                line=dict(color='#555555', width=4, dash='dot'),
-                marker=dict(
-                    size=[0] + [14] * len(df_pred_plot),
-                    color=['#7B3FF2'] + ['#555555'] * len(df_pred_plot)
-                )
-            ))
-
-            pred_mes = df_pred_plot.iloc[0]
-            fig_tendencia.add_annotation(
-                x=pred_mes["MesIndex"],
-                y=pred_mes["precio_final"],
-                text="Mes Predicho",
-                showarrow=True,
-                arrowhead=1,
-                ax=0,
-                ay=-40,
-                font=dict(color="#333333", size=14, family="sans-serif"),
-                bgcolor="#FFF",
-                bordercolor="#111",
-                borderwidth=3,
-                arrowcolor="#111"
-            )
-
-
-        fig_tendencia.update_layout(
-            height=500,
+        fig_placeholder = px.line(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+        fig_placeholder.update_layout(
+            height=350,
             plot_bgcolor="#FFF",
             paper_bgcolor="#FFF",
-            margin=dict(l=20, r=20, t=30, b=20),
-            font=dict(family="sans-serif", color="#222"),
-            xaxis=dict(
-                title=None,
-                showgrid=False,
-                zeroline=False,
-                tickmode='array',
-                tickvals=df_total["MesIndex"],
-                ticktext=[row['MesAbrev'] for _, row in df_total.iterrows()],
-                tickfont=dict(
-                    size=18,  # Más grande
-                    family="sans-serif",
-                    color="#222",
-                )
-            ),
-            yaxis=dict(
-                title=None,
-                showgrid=True,
-                gridcolor="#b0b0b0",
-                gridwidth=2,          # Más grueso
-                rangemode="tozero",
-                tickfont=dict(
-                    size=18,  # Más grande
-                    family="sans-serif",
-                    color="#222",
-                )
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font = dict (
-                    size = 16,
-                    family="sans-serif",
-                    color="#222"
-                )
-            )
+            xaxis=dict(showgrid=False, showticklabels=False),
+            yaxis=dict(showgrid=False, showticklabels=False),
+            annotations=[dict(text="Sin datos", x=0.5, y=0.5, showarrow=False, font=dict(size=20))]
         )
+        st.plotly_chart(fig_placeholder, use_container_width=True)
 
-        st.plotly_chart(fig_tendencia, use_container_width=True)
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-        # Gráficos por Región y Categoría
         col5, col6 = st.columns(2)
         with col5:
             st.markdown(
@@ -648,308 +912,23 @@ if 'df' in st.session_state:
                 "Ingresos por Región</h5>",
                 unsafe_allow_html=True
             )
-
-            # ----------------------------
-            # Construcción del mapa
-            # ----------------------------
-            ingresos_region = df_filtrado.groupby('region')['precio_final'].sum()
-
-            total_ingresos_region = ingresos_region.sum()
-
-            region_percent_map = (ingresos_region / total_ingresos_region * 100).round(1).to_dict()
-
-            all_regions_map = ["Noroeste", "Noreste", "Centro", "Occidente", "Sureste"]
-            for r in all_regions_map:
-                region_percent_map.setdefault(r, 0.0)
-
-            valores_map = [region_percent_map[r] for r in all_regions_map]
-            min_pct_map = min(valores_map)
-            max_pct_map = max(valores_map)
-            rango_map = max_pct_map - min_pct_map if max_pct_map > min_pct_map else 1.0
-
-
-            geojson_url = (
-                "https://gist.githubusercontent.com/walkerke/"
-                "76cb8cc5f949432f9555/raw/"
-                "363c297ce82a4dcb9bdf003d82aa4f64bc695cf1/mx.geojson"
+            # Mapa en estado 'sin datos'
+            fig_empty_map = px.scatter_mapbox(pd.DataFrame({'lat': [], 'lon': []}), lat='lat', lon='lon')
+            fig_empty_map.update_layout(
+                mapbox={'style': "open-street-map", 'zoom': 4, 'center': {'lat': 23.0, 'lon': -102.0}},
+                height=400,
+                margin=dict(l=0, r=0, t=0, b=0)
             )
-            response = requests.get(geojson_url)
-            mexico_geo = response.json()
-
-            region_mapping_map = {
-                "Baja California": "Noroeste",
-                "Baja California Sur": "Noroeste",
-                "Sinaloa": "Noroeste",
-                "Sonora": "Noroeste",
-                "Chihuahua": "Noreste",
-                "Durango": "Noreste",
-                "Coahuila": "Noreste",
-                "Nuevo León": "Noreste",
-                "Tamaulipas": "Noreste",
-                "Hidalgo": "Centro",
-                "Puebla": "Centro",
-                "Tlaxcala": "Centro",
-                "Querétaro": "Centro",
-                "Ciudad de México": "Centro",
-                "México": "Centro",
-                "Morelos": "Centro",
-                "Aguascalientes": "Occidente",
-                "Guanajuato": "Occidente",
-                "San Luis Potosí": "Occidente",
-                "Zacatecas": "Occidente",
-                "Colima": "Occidente",
-                "Jalisco": "Occidente",
-                "Michoacán": "Occidente",
-                "Nayarit": "Occidente",
-                "Campeche": "Sureste",
-                "Quintana Roo": "Sureste",
-                "Tabasco": "Sureste",
-                "Veracruz": "Sureste",
-                "Yucatán": "Sureste",
-                "Chiapas": "Sureste",
-                "Guerrero": "Sureste",
-                "Oaxaca": "Sureste",
-            }
-
-            for feature in mexico_geo["features"]:
-                estado_geo = feature["properties"]["name"]
-                meso_geo = region_mapping_map.get(estado_geo)
-                pct_geo = region_percent_map.get(meso_geo, 0.0)
-                ingresos_geo = ingresos_region.get(meso_geo, 0.0) 
-
-                if meso_geo is None:
-                    feature["properties"]["region"] = "Sin datos"
-                    feature["properties"]["percent_label"] = "0%"
-                    feature["properties"]["ingresos"] = 0.0
-                else:
-                    feature["properties"]["region"] = meso_geo
-                    feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
-                    feature["properties"]["ingresos"] = ingresos_geo
-
-            def style_function(feature):
-                meso_feat = feature["properties"].get("region", "")
-                label_feat = feature["properties"].get("percent_label", "0%")
-                try:
-                    pct_feat = float(label_feat.rstrip("%"))
-                except (ValueError, AttributeError):
-                    pct_feat = 0.0
-
-                if meso_feat not in all_regions_map:
-                    return {
-                        "fillColor": "#D3D3D3",
-                        "color": "black",
-                        "weight": 1,
-                        "fillOpacity": 0.4,
-                    }
-
-                intensidad_relatif = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
-                intensidad_relatif = max(min(intensidad_relatif, 1.0), 0.0)
-                intensidad_final_map = 0.30 + 0.70 * intensidad_relatif
-                intensidad_final_map = max(min(intensidad_final_map, 1.0), 0.30)
-                pct_for_blend = intensidad_final_map * 100.0
-
-                fill_color_hex = blend_with_white(BASE_RGB, pct_for_blend)
-
-                return {
-                    "fillColor": fill_color_hex,
-                    "color": "black",
-                    "weight": 1,
-                    "fillOpacity": 0.8,
-                }
-            m = folium.Map(location=[23.0, -102.0], zoom_start=5, tiles="cartodbpositron")
-            folium.GeoJson(
-                data=mexico_geo,
-                style_function=style_function,
-                tooltip=folium.GeoJsonTooltip(
-                    fields=["region", "ingresos", "percent_label"], 
-                    aliases=["Región:", "Ingresos totales:", "Porcentaje de ingresos:"],  
-                    localize=True,
-                    sticky=False
-                ),
-            ).add_to(m)
-
-            # <-- En lugar de st_folium, insertamos el HTML puro -->
-            map_html = m.get_root().render()
-            components.html(map_html, height=400, width=700)
+            st.plotly_chart(fig_empty_map, use_container_width=True)
 
         with col6:
             st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
-
-            categorias = df_filtrado['categoria_simplificada'].unique()
-
-            colores_random = [
-                "#1f77b4",  # Azul fuerte
-                "#d62728",  # Rojo fuerte
-                "#2ca02c",  # Verde fuerte
-                "#ff7f0e",  # Naranja fuerte
-                "#9467bd",  # Morado fuerte
-                "#8c564b",  # Marrón fuerte
-                "#e377c2",  # Rosa fuerte
-                "#7f7f7f",  # Gris fuerte
-                "#bcbd22",  # Amarillo verdoso fuerte
-                "#17becf",  # Cian fuerte
-            ][:len(categorias)]
-
-            bubble_data = df_filtrado.groupby('categoria_simplificada').agg({
-                'costo_de_flete': 'mean',
-                'precio_final': 'mean',
-                'peso_volumetrico_kg': 'mean',
-                'order_id': 'count'
-            }).reset_index()
-
-            bubble_data.columns = ['Categoría', 'Costo de Flete', 'Precio Final', 'Peso Volumétrico (kg)', 'Tamaño']
-
-            fig_bub = go.Figure()
-
-            size_values = bubble_data['Peso Volumétrico (kg)'] * 15
-            sizeref = 2. * max(size_values) / (80 ** 2)
-
-            for idx, row in bubble_data.iterrows():
-                fig_bub.add_trace(go.Scatter(
-                    x=[row['Costo de Flete']],
-                    y=[row['Precio Final']],
-                    mode='markers',
-                    marker=dict(
-                        size=row['Peso Volumétrico (kg)'] * 15,
-                        #color=colores_random[idx],
-                        sizemode='area',
-                        sizeref=sizeref,
-                        sizemin=8,
-                        opacity=0.5,
-                        line=dict(width=1, color="rgba(0,0,0,0.1)")
-                    ),
-                    name=row['Categoría'],
-                    hovertemplate=f"<b>{row['Categoría']}</b><br>Costo de Flete: {row['Costo de Flete']:.2f}<br>Precio Final: {row['Precio Final']:.2f}<br>Peso Volumétrico (kg): {row['Peso Volumétrico (kg)']:.2f}<extra></extra>",
-                    visible=True
-                ))
-
-            visible_legendonly = ['legendonly'] * len(categorias)
-            visible_true = [True] * len(categorias)
-
-            fig_bub.update_layout(
-                height=450,
-                width=2000,
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF",
-                margin=dict(l=20, r=20, t=30, b=20),
-                xaxis=dict(
-                    title=dict(
-                        text="Costo de Flete",
-                        font=dict(size=17, color="#222")
-                    ),
-                    tickfont=dict(
-                        size=15,
-                        color="#222"
-                    )
-                ),
-                yaxis=dict(
-                    showgrid=True,  # Movido fuera de title
-                    gridcolor="#b0b0b0",  # Gris oscuro
-                    gridwidth=1,  # Más grueso
-                    title=dict(
-                        text="Ingresos",
-                        font=dict(size=17, family="sans-serif", color="#222")
-                    ),
-                    tickfont=dict(
-                        size=15,
-                        family="sans-serif",
-                        color="#222"
-                    )
-                ),
-                legend=dict(  # Movido fuera de yaxis
-                    orientation="v",
-                    y=0.5,
-                    x=1.1,
-                    font=dict(size=17, family="sans-serif", color="#222")
-                ),
-                updatemenus=[  # Movido fuera de yaxis
-                    dict(
-                        type="buttons",
-                        direction="left",
-                        buttons=[
-                            dict(
-                                args=[{"visible": visible_legendonly}],
-                                label="❌ Quitar todas",
-                                method="restyle"
-                            ),
-                            dict(
-                                args=[{"visible": visible_true}],
-                                label="✅ Mostrar todas",
-                                method="restyle"
-                            )
-                        ],
-                        pad={"r": 10, "t": 10},
-                        showactive=False,
-                        x=0,
-                        xanchor="left",
-                        y=1.15,
-                        yanchor="top"
-                    )
-                ]
+            fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
+            fig_placeholder3.update_layout(
+                annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
+                showlegend=False
             )
+            st.plotly_chart(fig_placeholder3, use_container_width=True)
 
-            st.plotly_chart(fig_bub, use_container_width=True)
-
-
-else:
-    st.info("Sube tu base de datos para ver las métricas filtradas")
-
-    col1, col2, col3, col4 = st.columns(4)
-    for col, label in zip(
-        [col1, col2, col3, col4],
-        ["🏦 Ingresos Totales", "📦 Pedidos Totales", "💵 Valor Promedio", "🚚 Flete Promedio"]
-    ):
-        with col:
-            st.markdown(
-                f"""<div class="kpi-card">
-                        <div class="kpi-label">{label}</div>
-                        <div class="kpi-value" style="color:#DDD;">---</div>
-                        <div class="kpi-subtext" style="color:#DDD;">Sin datos</div>
-                    </div>""",
-                unsafe_allow_html=True
-            )
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    st.markdown(
-        f"<h4 style='color:{COLOR_PRIMARY};font-size:1.75rem; margin-bottom:0.5rem;'>"
-        "Tendencia de Ingresos Mensuales</h4>",
-        unsafe_allow_html=True
-    )
-    fig_placeholder = px.line(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
-    fig_placeholder.update_layout(
-        height=350,
-        plot_bgcolor="#FFF",
-        paper_bgcolor="#FFF",
-        xaxis=dict(showgrid=False, showticklabels=False),
-        yaxis=dict(showgrid=False, showticklabels=False),
-        annotations=[dict(text="Sin datos", x=0.5, y=0.5, showarrow=False, font=dict(size=20))]
-    )
-    st.plotly_chart(fig_placeholder, use_container_width=True)
-
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-
-    col5, col6 = st.columns(2)
-    with col5:
-        st.markdown(
-            f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
-            "Ingresos por Región</h5>",
-            unsafe_allow_html=True
-        )
-        # Mapa en estado 'sin datos'
-        fig_empty_map = px.scatter_mapbox(pd.DataFrame({'lat': [], 'lon': []}), lat='lat', lon='lon')
-        fig_empty_map.update_layout(
-            mapbox={'style': "open-street-map", 'zoom': 4, 'center': {'lat': 23.0, 'lon': -102.0}},
-            height=400,
-            margin=dict(l=0, r=0, t=0, b=0)
-        )
-        st.plotly_chart(fig_empty_map, use_container_width=True)
-
-    with col6:
-        st.markdown(f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>Costos Operativos</h5>", unsafe_allow_html=True)
-        fig_placeholder3 = px.scatter(pd.DataFrame({'x': [], 'y': []}), x='x', y='y')
-        fig_placeholder3.update_layout(
-            annotations=[dict(text="Sin datos", x=0.5, y=0.5, font_size=20, showarrow=False)],
-            showlegend=False
-        )
-        st.plotly_chart(fig_placeholder3, use_container_width=True)
+with tab2:
+    st.write("Aquí irá el contenido del segundo tab. Por ahora, este texto.")
