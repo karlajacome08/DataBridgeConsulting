@@ -905,7 +905,7 @@ with tab1:
                     margin=dict(l=20, r=20, t=30, b=100),
                     xaxis=dict(
                         title=None,
-                        tickfont=dict(size=14, color="#222"),
+                        tickfont=dict(size=20, color="#222"),
                         tickangle=-45
                     ),
                     yaxis=dict(
