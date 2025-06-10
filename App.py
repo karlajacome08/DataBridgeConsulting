@@ -939,7 +939,41 @@ if 'df' in st.session_state:
             )
 
             st.plotly_chart(fig_bub, use_container_width=True)
-
+            
+            st.markdown("""
+            <style>
+            #sugerencia-btn {
+                position: fixed;
+                bottom: 36px;
+                right: 48px;
+                z-index: 9999;
+            }
+            #sugerencia-btn button {
+                background: #001A57;
+                color: #fff;
+                border: none;
+                border-radius: 50px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+                padding: 18px 26px 18px 22px;
+                font-size: 1.35rem;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            #sugerencia-btn button:hover {
+                background: #173b7b;
+            }
+            </style>
+            <div id="sugerencia-btn">
+            <button onclick="window.alert('¡Aquí irán las sugerencias del socio formador!')">
+                <span style="font-size:1.65rem;">👩‍💼</span>
+                <span>Sugerencias</span>
+            </button>
+            </div>
+            """, unsafe_allow_html=True)
 
 else:
     st.info("Sube tu base de datos para ver las métricas filtradas")
