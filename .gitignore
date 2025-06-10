@@ -7,3 +7,4 @@ df_DataBridgeConsulting.parquet
 prediccion_diaria.parquet
 prediccion_region.parquet
 prediccion_categoria.parquet
+alertas.txt

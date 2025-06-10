@@ -114,12 +114,8 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
         factor_ajuste = 1 + (pendiente / abs(ingresos_mensuales[-1]))
     if pendiente < 0:
         factor_ajuste = max(0.7, min(factor_ajuste, 1))
-        tendencia_txt = "↓ BAJADA"
     else:
         factor_ajuste = min(1.3, max(factor_ajuste, 1))
-        tendencia_txt = "↑ SUBIDA"
-    print(f"\nTendencia detectada ultimos 3 meses: {tendencia_txt}")
-    print(f"Factor de ajuste aplicado: {factor_ajuste:.2f}x")
     for fecha_pred in fechas_pred:
         dia_semana = fecha_pred.dayofweek
         dia_mes = fecha_pred.day
@@ -195,12 +191,8 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
         factor_ajuste = 1 + (pendiente / abs(ingresos_mensuales[-1]))
     if pendiente < 0:
         factor_ajuste = max(0.7, min(factor_ajuste, 1))
-        tendencia_txt = "↓ BAJADA"
     else:
         factor_ajuste = min(1.3, max(factor_ajuste, 1))
-        tendencia_txt = "↑ SUBIDA"
-    print(f"\nTendencia detectada ultimos 3 meses: {tendencia_txt}")
-    print(f"Factor de ajuste aplicado: {factor_ajuste:.2f}x")
     for fecha_pred in fechas_pred:
         dia_semana = fecha_pred.dayofweek
         dia_mes = fecha_pred.day
@@ -338,7 +330,96 @@ def pipeline_prediccion_por_grupo_mes_a_mes(df, columna, nombre_archivo, df_diar
         df_final = df_merged[['fecha', columna, 'prediccion']]
         output_path = os.path.abspath(nombre_archivo)
         df_final.to_parquet(output_path, engine="pyarrow", compression="snappy", index=False)
-        print(f"Archivo generado: {output_path}")
+
+def generar_alertas_con_predicciones(df_real, df_pred_diaria, df_pred_region, df_pred_categoria):
+    fecha_inicio_pred = pd.to_datetime(df_pred_diaria['fecha']).min()
+    fecha_fin_pred = pd.to_datetime(df_pred_diaria['fecha']).max()
+    fecha_inicio_4m = fecha_inicio_pred - pd.DateOffset(months=4)
+    fecha_fin_4m = fecha_inicio_pred - pd.DateOffset(days=1)
+
+    df_real['orden_compra_timestamp'] = pd.to_datetime(df_real['orden_compra_timestamp'])
+    df_4m_real = df_real[(df_real['orden_compra_timestamp'] >= fecha_inicio_4m) &
+                         (df_real['orden_compra_timestamp'] <= fecha_fin_4m)]
+
+    cat_group = df_4m_real.groupby('categoria_simplificada').agg(
+        ingreso_real_4m=('precio_final', 'sum'),
+        pedidos_4m=('precio_final', 'count')
+    ).reset_index()
+    pred_cat_group = df_pred_categoria.groupby('categoria_simplificada').agg(
+        ingreso_pred_2m=('prediccion', 'sum'),
+        pedidos_2m=('prediccion', 'count')
+    ).reset_index()
+
+    alertas_caida_cat = []
+    for _, row_real in cat_group.iterrows():
+        cat = row_real['categoria_simplificada']
+        ingreso_real_mensual = row_real['ingreso_real_4m'] / 4 if row_real['pedidos_4m'] > 0 else 0
+        pred_row = pred_cat_group[pred_cat_group['categoria_simplificada'] == cat]
+        if pred_row.empty:
+            continue
+        ingreso_pred_mensual = float(pred_row['ingreso_pred_2m'].values[0]) / 2 if float(pred_row['pedidos_2m'].values[0]) > 0 else 0
+        if ingreso_real_mensual > 0:
+            cambio_pct = ((ingreso_pred_mensual - ingreso_real_mensual) / ingreso_real_mensual) * 100
+            if cambio_pct < -15:
+                alertas_caida_cat.append(
+                    f"{cat} bajó {abs(cambio_pct):.2f}%"
+                )
+    if alertas_caida_cat:
+        alerta_caida_cat = "Categorías con caída de más del 15% en ingreso mensual:\n" + "\n".join(alertas_caida_cat)
+    else:
+        alerta_caida_cat = "Sin alerta de caídas mayores al 15% en ingreso mensual por categoría."
+
+    alertas_cat = []
+    for _, row_real in cat_group.iterrows():
+        cat = row_real['categoria_simplificada']
+        ingreso_real_mensual = row_real['ingreso_real_4m'] / 4 if row_real['pedidos_4m'] > 0 else 0
+        volumen_cat_mensual = row_real['pedidos_4m'] / 4 if row_real['pedidos_4m'] > 0 else 0
+        pred_row = pred_cat_group[pred_cat_group['categoria_simplificada'] == cat]
+        if pred_row.empty or volumen_cat_mensual == 0:
+            continue
+        ingreso_pred_mensual = float(pred_row['ingreso_pred_2m'].values[0]) / 2 if float(pred_row['pedidos_2m'].values[0]) > 0 else 0
+        perdida_cat = (ingreso_real_mensual - ingreso_pred_mensual) * volumen_cat_mensual * 2
+        if ingreso_pred_mensual < ingreso_real_mensual and perdida_cat > 0:
+            alertas_cat.append(
+                f"{cat} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f}, pérdida aprox: ${perdida_cat:.2f})"
+            )
+    if alertas_cat:
+        alerta_cat = "Categorías con disminución de ingreso promedio mensual:\n" + "\n".join(alertas_cat)
+    else:
+        alerta_cat = "Sin alerta de disminución por categoría."
+
+    reg_group = df_4m_real.groupby('region').agg(
+        ingreso_real_4m=('precio_final', 'sum'),
+        pedidos_4m=('precio_final', 'count')
+    ).reset_index()
+    pred_reg_group = df_pred_region.groupby('region').agg(
+        ingreso_pred_2m=('prediccion', 'sum'),
+        pedidos_2m=('prediccion', 'count')
+    ).reset_index()
+
+    alertas_reg = []
+    for _, row_real in reg_group.iterrows():
+        reg = row_real['region']
+        ingreso_real_mensual = row_real['ingreso_real_4m'] / 4 if row_real['pedidos_4m'] > 0 else 0
+        volumen_reg_mensual = row_real['pedidos_4m'] / 4 if row_real['pedidos_4m'] > 0 else 0
+        pred_row = pred_reg_group[pred_reg_group['region'] == reg]
+        if pred_row.empty or volumen_reg_mensual == 0:
+            continue
+        ingreso_pred_mensual = float(pred_row['ingreso_pred_2m'].values[0]) / 2 if float(pred_row['pedidos_2m'].values[0]) > 0 else 0
+        perdida_reg = (ingreso_real_mensual - ingreso_pred_mensual) * volumen_reg_mensual * 2
+        if ingreso_pred_mensual < ingreso_real_mensual and perdida_reg > 0:
+            alertas_reg.append(
+                f"{reg} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f}, pérdida: ${perdida_reg:.2f})"
+            )
+    if alertas_reg:
+        alerta_reg = "Regiones con disminución de ingreso promedio mensual:\n" + "\n".join(alertas_reg)
+    else:
+        alerta_reg = "Sin alerta de disminución por región."
+
+    with open("alertas.txt", "w", encoding="utf-8") as f:
+        f.write(alerta_caida_cat + "\n\n")
+        f.write(alerta_cat + "\n\n")
+        f.write(alerta_reg + "\n")
 
 def main():
     df = cargar_datos("df_DataBridgeConsulting.parquet")
@@ -404,6 +485,14 @@ def main():
 
     pipeline_prediccion_por_grupo_mes_a_mes(df, 'region', 'prediccion_region.parquet', resultados)
     pipeline_prediccion_por_grupo_mes_a_mes(df, 'categoria_simplificada', 'prediccion_categoria.parquet', resultados)
+
+    # Cargar archivos de predicción
+    df_pred_diaria = pd.read_parquet("prediccion_diaria.parquet")
+    df_pred_region = pd.read_parquet("prediccion_region.parquet")
+    df_pred_categoria = pd.read_parquet("prediccion_categoria.parquet")
+
+    # Generar alertas comparando real vs predicho
+    generar_alertas_con_predicciones(df, df_pred_diaria, df_pred_region, df_pred_categoria)
 
 if __name__ == "__main__":
     main()
