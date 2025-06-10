@@ -861,7 +861,7 @@ with tab1:
                     unsafe_allow_html=True
                 )
 
-                # Preparamos los datos (siempre de mayor a menor)
+                # 1) Preparamos los datos
                 bar_data = (
                     df_filtrado
                     .groupby('categoria_simplificada')['costo_de_flete']
@@ -875,23 +875,27 @@ with tab1:
                     .reset_index(drop=True)
                 )
 
-                # Generamos colores: top 3 resaltadas
-                highlight_color = COLOR_PRIMARY
-                default_color   = "#27548A"
+                # 2) Etiqueta: primera palabra, salvo 'No Proporcionado'
+                bar_data['Etiqueta'] = bar_data['Categoría'].apply(
+                    lambda cat: cat if cat == "No proporcionado" else cat.split()[0]
+                )
+
+                # 3) Colores top 3 / resto
                 colors = [
-                    highlight_color if idx < 3 else default_color
-                    for idx in range(len(bar_data))
+                    COLOR_PRIMARY if i < 3 else "#27548A"
+                    for i in range(len(bar_data))
                 ]
 
-                # Creamos el gráfico de barras vertical
+                # 4) Dibujamos la barra usando 'Etiqueta' para ticks
                 fig_bar = go.Figure(go.Bar(
-                    x=bar_data['Categoría'],
+                    x=bar_data['Etiqueta'],
                     y=bar_data['Costo Promedio de Flete'],
                     marker=dict(color=colors),
                     text=bar_data['Costo Promedio de Flete'].map(lambda v: f"${v:.2f}"),
                     textposition='inside',
-                    textfont=dict( size=18),
-                    hovertemplate="<b>%{x}</b><br>Costo: %{y:.2f}<extra></extra>"
+                    textfont=dict(color='white', size=16),
+                    customdata=bar_data['Categoría'],  # para hover
+                    hovertemplate="<b>%{customdata}</b><br>Costo: %{y:.2f}<extra></extra>"
                 ))
 
                 fig_bar.update_layout(
@@ -901,7 +905,7 @@ with tab1:
                     margin=dict(l=20, r=20, t=30, b=100),
                     xaxis=dict(
                         title=None,
-                        tickfont=dict(size=15, color="#222"),
+                        tickfont=dict(size=14, color="#222"),
                         tickangle=-45
                     ),
                     yaxis=dict(
@@ -914,6 +918,8 @@ with tab1:
                 )
 
                 st.plotly_chart(fig_bar, use_container_width=True)
+
+
 
     else:
         st.info("Sube tu base de datos para ver las métricas filtradas")
