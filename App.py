@@ -519,8 +519,12 @@ if 'df' in st.session_state:
         dias_por_mes = df_filtrado.groupby(['Año', 'Mes'])['Dia'].nunique().reset_index()
         dias_por_mes.rename(columns={'Dia': 'DiasRegistrados'}, inplace=True)
 
-        MIN_DIAS_MES = 28
-        meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
+        if (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías"):
+            MIN_DIAS_MES = 28
+            meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
+        else:
+            # Tomar todos los meses sin filtrar por días
+            meses_validos = dias_por_mes[['Año', 'Mes']]
 
         df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
         df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
@@ -556,7 +560,10 @@ if 'df' in st.session_state:
             ))
 
         # Línea de predicción solo si hay predicción y datos reales
-        if not df_pred_plot.empty and not df_real.empty:
+        # Solo mostrar la línea de predicción si los filtros están en "Todas"
+        mostrar_prediccion = (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías")
+        
+        if mostrar_prediccion and not df_pred_plot.empty and not df_real.empty:
             fig_tendencia.add_trace(go.Scatter(
                 x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
                 y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
