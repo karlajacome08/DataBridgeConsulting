@@ -12,8 +12,8 @@ import requests
 from streamlit_folium import st_folium
 import streamlit.components.v1 as components  # <-- para incrustar HTML puro
 
-COLOR_PRIMARY = "#7B3FF2"
-COLOR_SECUNDARY = "#989898"
+COLOR_PRIMARY = "#001A57"
+COLOR_SECUNDARY = "#000033"
 COLOR_ACCENT = "#009944"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#e0e0e0"
@@ -319,7 +319,7 @@ with st.sidebar:
 
     # Título grande antes del uploader
     st.markdown(
-         "<span style='font-size:1.6rem; font-weight:700; color:#7B3FF2;'>Subir base de datos</span>",
+         "<span style='font-size:1.6rem; font-weight:700; color:#001A57;'>Subir base de datos</span>",
         unsafe_allow_html=True
 )
     uploaded_file = st.file_uploader(
@@ -555,7 +555,7 @@ if 'df' in st.session_state:
                 y=df_real["precio_final"],
                 mode='lines+markers',
                 name='Datos reales',
-                line=dict(color="#3B82F6", width=3),
+                line=dict(color="#001A57", width=3),
                 marker=dict(size=8, color="#3B82F6")
             ))
 
@@ -725,6 +725,8 @@ if 'df' in st.session_state:
                     feature["properties"]["region"] = meso_geo
                     feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
                     feature["properties"]["ingresos"] = ingresos_geo
+
+            BASE_RGB = (0, 26, 87)
 
             def style_function(feature):
                 meso_feat = feature["properties"].get("region", "")
