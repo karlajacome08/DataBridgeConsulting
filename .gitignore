@@ -1,5 +1,9 @@
 venv/
 .venv/
+.DS_Store
+__pycache__/
 
-df_DataBridgeConsulting.xlsx
-prediccion_mes_siguiente.csv
+df_DataBridgeConsulting.parquet
+prediccion_diaria.parquet
+prediccion_region.parquet
+prediccion_categoria.parquet

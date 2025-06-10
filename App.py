@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import folium
 import requests
 from streamlit_folium import st_folium
-import streamlit.components.v1 as components  # <-- para incrustar HTML puro
+import streamlit.components.v1 as components
 
 COLOR_PRIMARY = "#001A57"
 COLOR_SECUNDARY = "#000033"
@@ -378,7 +378,7 @@ with st.sidebar:
             st.success("¡Archivo cargado exitosamente!")
 
             resultado = subprocess.run(
-                [sys.executable, "modelo_v1.py"],
+                [sys.executable, "models/modelo_v1.py"],
                 capture_output=True,
                 text=True
             )
@@ -392,12 +392,21 @@ with st.sidebar:
                 #st.text("Detalles del error:")
                 st.code(resultado.stderr, language='bash')
 
-            if os.path.exists("prediccion_mes_siguiente.csv"):
-                df_pred = pd.read_csv("prediccion_mes_siguiente.csv")
-                df_pred["Tipo"] = "pred"
+            if os.path.exists("prediccion_diaria.parquet"):
+                df_pred_diaria = pd.read_parquet("prediccion_diaria.parquet")
+                df_pred_diaria['fecha'] = pd.to_datetime(df_pred_diaria['fecha'])
+                df_pred_mensual = df_pred_diaria.groupby([
+                    df_pred_diaria['fecha'].dt.year.rename('Año'),
+                    df_pred_diaria['fecha'].dt.month.rename('Mes')
+                ]).agg({
+                    'prediccion': 'sum',
+                    'pred_rf': 'sum',
+                    'pred_xgb': 'sum'
+                }).reset_index()
+                df_pred_mensual['Tipo'] = "pred"
                 st.success("Predicción mensual generada y cargada.")
             else:
-                df_pred = pd.DataFrame()
+                df_pred_mensual = pd.DataFrame()
                 st.warning("No se generó predicción para el mes siguiente.")
 
         except Exception as e:
@@ -519,11 +528,6 @@ with tab1:
             if flete_promedio_anterior > 0 else 0.0
         )
 
-        comparacion_labels = {
-        "Último año": "vs año anterior",
-        "Últimos 6 meses": "vs mismos 6 meses año anterior",
-        "Últimos 3 meses": "vs mismos 3 meses año anterior"
-}
         # KPI Cards
         col1, col2, col3, col4 = st.columns(4)
 
@@ -537,7 +541,6 @@ with tab1:
                             <div class="kpi-value">${ingresos_totales:,.0f}</div>
                             <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
                         </div>
-                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -552,7 +555,6 @@ with tab1:
                             <div class="kpi-value">{pedidos_totales:,}</div>
                             <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
                         </div>
-                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -567,7 +569,6 @@ with tab1:
                             <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
                             <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
                         </div>
-                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -582,7 +583,6 @@ with tab1:
                             <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
                             <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
                         </div>
-                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -613,8 +613,14 @@ with tab1:
             df_mensual = pd.merge(df_mensual, meses_validos, on=['Año', 'Mes'], how='inner')
             df_mensual['Tipo'] = "real"
 
-            if not df_pred.empty:
-                df_pred_plot_total = df_pred[["Año", "Mes", "precio_final", "Tipo"]]
+            if not df_pred_mensual.empty:
+                df_pred_mensual = df_pred_mensual.rename(columns={'prediccion': 'precio_final'})
+                for col in ['pred_rf', 'pred_xgb']:
+                    if col not in df_pred_mensual.columns:
+                        df_pred_mensual[col] = np.nan
+                df_pred_plot_total = df_pred_mensual[["Año", "Mes", "precio_final", "pred_rf", "pred_xgb", "Tipo"]]
+                df_mensual['pred_rf'] = np.nan
+                df_mensual['pred_xgb'] = np.nan
                 df_total = pd.concat([df_mensual, df_pred_plot_total], ignore_index=True)
             else:
                 df_total = df_mensual
@@ -651,7 +657,7 @@ with tab1:
                     x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
                     y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
                     mode='lines+markers',
-                    name='Predicción mes siguiente',
+                    name='Prediccion',
                     line=dict(color='#555555', width=4, dash='dot'),
                     marker=dict(
                         size=[0] + [14] * len(df_pred_plot),
@@ -659,22 +665,34 @@ with tab1:
                     )
                 ))
 
-                pred_mes = df_pred_plot.iloc[0]
-                fig_tendencia.add_annotation(
-                    x=pred_mes["MesIndex"],
-                    y=pred_mes["precio_final"],
-                    text="Mes Predicho",
-                    showarrow=True,
-                    arrowhead=1,
-                    ax=0,
-                    ay=-40,
-                    font=dict(color="#333333", size=14, family="sans-serif"),
-                    bgcolor="#FFF",
-                    bordercolor="#111",
-                    borderwidth=3,
-                    arrowcolor="#111"
-                )
+                last_real_x = df_real["MesIndex"].iloc[-1]
+                last_min = min(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
+                last_max = max(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
+                min_pred = np.minimum(df_pred_plot["pred_rf"], df_pred_plot["pred_xgb"])
+                max_pred = np.maximum(df_pred_plot["pred_rf"], df_pred_plot["pred_xgb"])
+                x_extended = [last_real_x] + df_pred_plot["MesIndex"].tolist()
+                min_extended = [last_min] + min_pred.tolist()
+                max_extended = [last_max] + max_pred.tolist()
 
+                fig_tendencia.add_trace(go.Scatter(
+                    x=x_extended,
+                    y=min_extended,
+                    mode='lines',
+                    name='Mínimo',
+                    line=dict(color="red", width=2, dash='dash'),
+                    showlegend=True
+                ))
+
+                fig_tendencia.add_trace(go.Scatter(
+                    x=x_extended,
+                    y=max_extended,
+                    mode='lines',
+                    name='Máximo',
+                    line=dict(color="green", width=2, dash='dot'),
+                    fill='tonexty',
+                    fillcolor='rgba(0,0,255,0.15)',
+                    showlegend=True
+                ))
 
             fig_tendencia.update_layout(
                 height=500,
@@ -1018,4 +1036,105 @@ with tab1:
             st.plotly_chart(fig_placeholder3, use_container_width=True)
 
 with tab2:
-    st.write("Aquí irá el contenido del segundo tab. Por ahora, este texto.")
+    st.markdown(
+        "<h2 style='color:#0E2148; margin-bottom:1.5rem;'>Predicciones</h2>",
+        unsafe_allow_html=True
+    )
+
+    archivos = [
+        ("Predicción Diaria", "prediccion_diaria.parquet"),
+        ("Predicción por Región", "prediccion_region.parquet"),
+        ("Predicción por Categoría", "prediccion_categoria.parquet"),
+    ]
+
+    col1, col2, col3 = st.columns(3)
+    for col, (label, filename) in zip([col1, col2, col3], archivos):
+        if os.path.exists(filename):
+            df_pred = pd.read_parquet(filename)
+            if "prediccion" in df_pred.columns:
+                suma = df_pred["prediccion"].sum()
+            elif "ingresos" in df_pred.columns:
+                suma = df_pred["ingresos"].sum()
+            elif "precio_final" in df_pred.columns:
+                suma = df_pred["precio_final"].sum()
+            else:
+                suma = float("nan")
+            valor = f"${suma:,.2f}"
+            subtext = "Suma total de ingresos"
+        else:
+            valor = "---"
+            subtext = "Archivo no encontrado"
+        with col:
+            st.markdown(
+                f"""
+                <div class="kpi-card">
+                    <div class="kpi-label">{label}</div>
+                    <div class="kpi-value">{valor}</div>
+                    <div class="kpi-subtext">{subtext}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+        "<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo de suma diaria de ingresos por archivo de predicción</h4>",
+        unsafe_allow_html=True
+    )
+
+    colg1, colg2, colg3 = st.columns(3)
+    for col, (label, filename) in zip([colg1, colg2, colg3], archivos):
+        if os.path.exists(filename):
+            df_pred = pd.read_parquet(filename)
+            fecha_col = "fecha" if "fecha" in df_pred.columns else df_pred.columns[0]
+            if "prediccion" in df_pred.columns:
+                y_col = "prediccion"
+            elif "ingresos" in df_pred.columns:
+                y_col = "ingresos"
+            elif "precio_final" in df_pred.columns:
+                y_col = "precio_final"
+            else:
+                continue
+
+            if any(c in df_pred.columns for c in ["region", "categoria_simplificada", "grupo"]):
+                df_plot = df_pred.groupby(fecha_col)[y_col].sum().reset_index()
+            else:
+                df_plot = df_pred[[fecha_col, y_col]].copy()
+            df_plot[fecha_col] = pd.to_datetime(df_plot[fecha_col])
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df_plot[fecha_col],
+                y=df_plot[y_col],
+                mode='lines+markers',
+                name=label,
+                line=dict(color="#3E08A9", width=3),
+                marker=dict(size=7, color="#009944")
+            ))
+            fig.update_layout(
+                title=label,
+                xaxis_title="Fecha",
+                yaxis_title="Suma diaria de ingresos",
+                height=350,
+                plot_bgcolor="#FFF",
+                paper_bgcolor="#FFF",
+                margin=dict(l=10, r=10, t=40, b=30),
+                font=dict(family="sans-serif", color="#222", size=14),
+            )
+            col.plotly_chart(fig, use_container_width=True)
+        else:
+            col.info(f"No se encontró el archivo: {filename}")
+
+    st.markdown(
+        "<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Visualizador de archivos Parquet</h4>",
+        unsafe_allow_html=True
+    )
+
+    opciones = [nombre for nombre, _ in archivos]
+    opcion_sel = st.selectbox("Selecciona el archivo a visualizar", opciones, key="parquet_selector")
+
+    archivo_seleccionado = dict(archivos)[opcion_sel]
+    if os.path.exists(archivo_seleccionado):
+        df_viz = pd.read_parquet(archivo_seleccionado)
+        st.dataframe(df_viz, use_container_width=True, hide_index=True)
+    else:
+        st.warning(f"No se encontró el archivo: {archivo_seleccionado}")
