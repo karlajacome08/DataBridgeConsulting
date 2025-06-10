@@ -440,7 +440,7 @@ def aplicar_filtros(df, periodo, region, categoria):
 # --------------------
 # Lógica principal: mostrar métricas y gráficos
 # --------------------
-tab1, tab2 = st.tabs(["Tablero", "Otro Tab"])
+tab1, tab2 = st.tabs(["Tablero", "Predicciones"])
 with tab1:
     if 'df' in st.session_state:
         df_filtrado = aplicar_filtros(
@@ -736,9 +736,7 @@ with tab1:
                 # Construcción del mapa
                 # ----------------------------
                 ingresos_region = df_filtrado.groupby('region')['precio_final'].sum()
-
                 total_ingresos_region = ingresos_region.sum()
-
                 region_percent_map = (ingresos_region / total_ingresos_region * 100).round(1).to_dict()
 
                 all_regions_map = ["Noroeste", "Noreste", "Centro", "Occidente", "Sureste"]
@@ -749,7 +747,6 @@ with tab1:
                 min_pct_map = min(valores_map)
                 max_pct_map = max(valores_map)
                 rango_map = max_pct_map - min_pct_map if max_pct_map > min_pct_map else 1.0
-
 
                 geojson_url = (
                     "https://gist.githubusercontent.com/walkerke/"
@@ -798,7 +795,7 @@ with tab1:
                     estado_geo = feature["properties"]["name"]
                     meso_geo = region_mapping_map.get(estado_geo)
                     pct_geo = region_percent_map.get(meso_geo, 0.0)
-                    ingresos_geo = ingresos_region.get(meso_geo, 0.0) 
+                    ingresos_geo = ingresos_region.get(meso_geo, 0.0)
 
                     if meso_geo is None:
                         feature["properties"]["region"] = "Sin datos"
@@ -809,15 +806,16 @@ with tab1:
                         feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
                         feature["properties"]["ingresos"] = ingresos_geo
 
-            BASE_RGB = (0, 26, 87)
+                # Redefinimos el color base si lo deseas
+                BASE_RGB = (0, 26, 87)
 
-            def style_function(feature):
-                meso_feat = feature["properties"].get("region", "")
-                label_feat = feature["properties"].get("percent_label", "0%")
-                try:
-                    pct_feat = float(label_feat.rstrip("%"))
-                except (ValueError, AttributeError):
-                    pct_feat = 0.0
+                def style_function(feature):
+                    meso_feat = feature["properties"].get("region", "")
+                    label_feat = feature["properties"].get("percent_label", "0%")
+                    try:
+                        pct_feat = float(label_feat.rstrip("%"))
+                    except (ValueError, AttributeError):
+                        pct_feat = 0.0
 
                     if meso_feat not in all_regions_map:
                         return {
@@ -827,13 +825,10 @@ with tab1:
                             "fillOpacity": 0.4,
                         }
 
-                    intensidad_relatif = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
-                    intensidad_relatif = max(min(intensidad_relatif, 1.0), 0.0)
-                    intensidad_final_map = 0.30 + 0.70 * intensidad_relatif
-                    intensidad_final_map = max(min(intensidad_final_map, 1.0), 0.30)
-                    pct_for_blend = intensidad_final_map * 100.0
-
-                    fill_color_hex = blend_with_white(BASE_RGB, pct_for_blend)
+                    intensidad = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
+                    intensidad = max(min(intensidad, 1.0), 0.0)
+                    blend_pct = 30 + 70 * intensidad  # del 30% al 100%
+                    fill_color_hex = blend_with_white(BASE_RGB, blend_pct)
 
                     return {
                         "fillColor": fill_color_hex,
@@ -841,21 +836,23 @@ with tab1:
                         "weight": 1,
                         "fillOpacity": 0.8,
                     }
+
+                # Creamos y mostramos el mapa
                 m = folium.Map(location=[23.0, -102.0], zoom_start=5, tiles="cartodbpositron")
                 folium.GeoJson(
                     data=mexico_geo,
                     style_function=style_function,
                     tooltip=folium.GeoJsonTooltip(
-                        fields=["region", "ingresos", "percent_label"], 
-                        aliases=["Región:", "Ingresos totales:", "Porcentaje de ingresos:"],  
+                        fields=["region", "ingresos", "percent_label"],
+                        aliases=["Región:", "Ingresos totales:", "Porcentaje de ingresos:"],
                         localize=True,
-                        sticky=False
+                        sticky=False,
                     ),
                 ).add_to(m)
 
-                # <-- En lugar de st_folium, insertamos el HTML puro -->
                 map_html = m.get_root().render()
                 components.html(map_html, height=400, width=1200)
+
 
             with col6:
                 st.markdown(
@@ -879,8 +876,8 @@ with tab1:
                 )
 
                 # Generamos colores: top 3 resaltadas
-                highlight_color = "#5409DA"
-                default_color   = "#7965C1"
+                highlight_color = COLOR_PRIMARY
+                default_color   = "#27548A"
                 colors = [
                     highlight_color if idx < 3 else default_color
                     for idx in range(len(bar_data))
@@ -892,7 +889,8 @@ with tab1:
                     y=bar_data['Costo Promedio de Flete'],
                     marker=dict(color=colors),
                     text=bar_data['Costo Promedio de Flete'].map(lambda v: f"${v:.2f}"),
-                    textposition='outside',
+                    textposition='inside',
+                    textfont=dict( size=18),
                     hovertemplate="<b>%{x}</b><br>Costo: %{y:.2f}<extra></extra>"
                 ))
 
