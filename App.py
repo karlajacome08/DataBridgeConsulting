@@ -12,8 +12,8 @@ import requests
 from streamlit_folium import st_folium
 import streamlit.components.v1 as components  # <-- para incrustar HTML puro
 
-COLOR_PRIMARY = "#7B3FF2"
-COLOR_SECUNDARY = "#989898"
+COLOR_PRIMARY = "#001A57"
+COLOR_SECUNDARY = "#000033"
 COLOR_ACCENT = "#009944"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#e0e0e0"
@@ -311,12 +311,12 @@ with st.sidebar:
         regiones = ["Todas las regiones"]
         categorias = ["Todas las categorías"]
 
-    periodo_options = ["Último año", "Últimos 6 meses (Próximamente)", "Último mes (Próximamente)"]
-    periodo_habilitados = ["Último año"]
+    periodo_options = ["Último año", "Últimos 6 meses", "Últimos 3 meses"]
+    periodo_habilitados = ["Último año", "Últimos 6 meses", "Últimos 3 meses"]
 
     periodo_sel = st.selectbox("Periodo", periodo_options)
     if periodo_sel not in periodo_habilitados:
-        st.warning("Esta opción estará disponible próximamente. Por favor selecciona 'Último año'.")
+        st.warning("Opción no válida. Por favor selecciona una opción disponible.")
         st.stop()
 
     region_sel = st.selectbox("Región", regiones)
@@ -354,7 +354,7 @@ with st.sidebar:
 
     # Título grande antes del uploader
     st.markdown(
-         "<span style='font-size:1.6rem; font-weight:700; color:#7B3FF2;'>Subir base de datos</span>",
+         "<span style='font-size:1.6rem; font-weight:700; color:#001A57;'>Subir base de datos</span>",
         unsafe_allow_html=True
 )
     uploaded_file = st.file_uploader(
@@ -412,10 +412,21 @@ def aplicar_filtros(df, periodo, region, categoria):
     df_filtrado = df.copy()
     df_filtrado['orden_compra_timestamp'] = pd.to_datetime(df_filtrado['orden_compra_timestamp'], errors='coerce')
     df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
+    
+    fecha_max = df_filtrado['orden_compra_timestamp'].max()
 
+
+    # Nuevas condiciones para los periodos
     if periodo == "Último año":
-        fecha_limite = df_filtrado['orden_compra_timestamp'].max() - pd.DateOffset(years=1)
-        df_filtrado = df_filtrado[df_filtrado['orden_compra_timestamp'] >= fecha_limite]
+        fecha_limite = fecha_max - pd.DateOffset(years=1)
+    elif periodo == "Últimos 6 meses":
+        fecha_limite = fecha_max - pd.DateOffset(months=6)
+    elif periodo == "Últimos 3 meses":
+        fecha_limite = fecha_max - pd.DateOffset(months=3)
+    else:
+        fecha_limite = fecha_max - pd.DateOffset(years=100)  # Todos los datos
+
+    df_filtrado = df_filtrado[df_filtrado['orden_compra_timestamp'] >= fecha_limite]
 
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
@@ -424,6 +435,7 @@ def aplicar_filtros(df, periodo, region, categoria):
         df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
 
     return df_filtrado
+
 
 # --------------------
 # Lógica principal: mostrar métricas y gráficos
@@ -443,101 +455,137 @@ with tab1:
             df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
             df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
 
-            año_actual = df_filtrado['año'].max()
-            mes_actual = df_filtrado['mes'].max()
+        # ►►► CÓDIGO CORREGIDO ▼▼▼ (reemplazar todo el bloque de métricas)
+        # 1. Determinar fechas del periodo actual filtrado
+        fecha_min = df_filtrado['orden_compra_timestamp'].min()
+        fecha_max = df_filtrado['orden_compra_timestamp'].max()
 
-            ingresos_totales = df_filtrado['precio_final'].sum()
-            ingresos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].sum()
-            ingresos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].sum()
-            delta_ingresos = (
-                (ingresos_año_actual - ingresos_año_anterior) / ingresos_año_anterior * 100
-                if ingresos_año_anterior > 0 else 0
+        # 2. Calcular periodo equivalente del año anterior
+        fecha_min_anterior = fecha_min - pd.DateOffset(years=1)
+        fecha_max_anterior = fecha_max - pd.DateOffset(years=1)
+
+        # 3. Filtrar datos del año anterior CON LOS MISMOS FILTROS
+        df_anterior = st.session_state['df'].copy()
+        df_anterior['orden_compra_timestamp'] = pd.to_datetime(df_anterior['orden_compra_timestamp'])
+        df_anterior = df_anterior[
+            (df_anterior['orden_compra_timestamp'] >= fecha_min_anterior) & 
+            (df_anterior['orden_compra_timestamp'] <= fecha_max_anterior)
+        ]
+
+        # Aplicar mismos filtros de región y categoría al periodo anterior
+        if region_sel != "Todas las regiones":
+            df_anterior = df_anterior[df_anterior['region'] == region_sel]
+        if categoria_sel != "Todas las categorías":
+            df_anterior = df_anterior[df_anterior['categoria_simplificada'] == categoria_sel]
+
+        # 4. Calcular TODAS las métricas con el nuevo método
+        # Ingresos
+        ingresos_totales = df_filtrado['precio_final'].sum()
+        ingresos_periodo_actual = df_filtrado['precio_final'].sum()
+        ingresos_periodo_anterior = df_anterior['precio_final'].sum()
+        delta_ingresos = (
+            (ingresos_periodo_actual - ingresos_periodo_anterior) / ingresos_periodo_anterior * 100 
+            if ingresos_periodo_anterior > 0 else 0.0
+        )
+
+        # Pedidos
+        pedidos_totales = df_filtrado['order_id'].nunique()
+        pedidos_periodo_actual = df_filtrado['order_id'].nunique()
+        pedidos_periodo_anterior = df_anterior['order_id'].nunique()
+        delta_pedidos = (
+            (pedidos_periodo_actual - pedidos_periodo_anterior) / pedidos_periodo_anterior * 100 
+            if pedidos_periodo_anterior > 0 else 0.0
+        )
+
+        # Valor promedio
+        valor_promedio_actual = (
+            ingresos_periodo_actual / pedidos_periodo_actual 
+            if pedidos_periodo_actual > 0 else 0
+        )
+        valor_promedio_anterior = (
+            ingresos_periodo_anterior / pedidos_periodo_anterior 
+            if pedidos_periodo_anterior > 0 else 0
+        )
+        delta_valor = (
+            (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100 
+            if valor_promedio_anterior > 0 else 0.0
+        )
+
+        # Flete promedio
+        flete_promedio_actual = df_filtrado['costo_de_flete'].mean()
+        flete_promedio_anterior = df_anterior['costo_de_flete'].mean()
+        delta_flete = (
+            (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100 
+            if flete_promedio_anterior > 0 else 0.0
+        )
+
+        comparacion_labels = {
+        "Último año": "vs año anterior",
+        "Últimos 6 meses": "vs mismos 6 meses año anterior",
+        "Últimos 3 meses": "vs mismos 3 meses año anterior"
+}
+        # KPI Cards
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_ingresos >= 0 else "↓"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">🏦 Ingresos Totales</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${ingresos_totales:,.0f}</div>
+                            <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
+                        </div>
+                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
+                    </div>""",
+                unsafe_allow_html=True
             )
 
-            pedidos_totales = df_filtrado['order_id'].nunique()
-            pedidos_año_actual = df_filtrado[df_filtrado['año'] == año_actual]['order_id'].nunique()
-            pedidos_año_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['order_id'].nunique()
-            delta_pedidos = (
-                (pedidos_año_actual - pedidos_año_anterior) / pedidos_año_anterior * 100
-                if pedidos_año_anterior > 0 else 0
+        with col2:
+            color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_pedidos >= 0 else "↓"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">📦 Pedidos Totales</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">{pedidos_totales:,}</div>
+                            <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
+                        </div>
+                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
+                    </div>""",
+                unsafe_allow_html=True
             )
 
-            valor_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['precio_final'].mean()
-            valor_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['precio_final'].mean()
-            delta_valor = (
-                (valor_promedio_actual - valor_promedio_anterior) / valor_promedio_anterior * 100
-                if valor_promedio_anterior > 0 else 0
+        with col3:
+            color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
+            flecha = "↑" if delta_valor >= 0 else "↓"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">💵 Valor Promedio</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
+                            <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
+                        </div>
+                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
+                    </div>""",
+                unsafe_allow_html=True
             )
 
-            flete_promedio_actual = df_filtrado[df_filtrado['año'] == año_actual]['costo_de_flete'].mean()
-            flete_promedio_anterior = df_filtrado[df_filtrado['año'] == (año_actual - 1)]['costo_de_flete'].mean()
-            delta_flete = (
-                (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100
-                if flete_promedio_anterior > 0 else 0
+        with col4:
+            color_flete = "kpi-delta-neg" if delta_flete >= 0 else "kpi-delta-pos"
+            flecha = "↑" if delta_flete >= 0 else "↓"
+            st.markdown(
+                f"""<div class="kpi-card">
+                        <div class="kpi-label">🚚 Flete Promedio</div>
+                        <div class="kpi-value-row">
+                            <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
+                            <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
+                        </div>
+                        <div class="kpi-subtext">{comparacion_labels[periodo_sel]}</div>
+                    </div>""",
+                unsafe_allow_html=True
             )
-
-            # KPI Cards
-            col1, col2, col3, col4 = st.columns(4)
-
-            with col1:
-                color_ingresos = "kpi-delta-pos" if delta_ingresos >= 0 else "kpi-delta-neg"
-                flecha = "↑" if delta_ingresos >= 0 else "↓"
-                st.markdown(
-                    f"""<div class="kpi-card">
-                            <div class="kpi-label">🏦 Ingresos Totales</div>
-                            <div class="kpi-value-row">
-                                <div class="kpi-value">${ingresos_totales:,.0f}</div>
-                                <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
-                            </div>
-                            <div class="kpi-subtext">vs año anterior</div>
-                        </div>""",
-                    unsafe_allow_html=True
-                )
-
-            with col2:
-                color_pedidos = "kpi-delta-pos" if delta_pedidos >= 0 else "kpi-delta-neg"
-                flecha = "↑" if delta_pedidos >= 0 else "↓"
-                st.markdown(
-                    f"""<div class="kpi-card">
-                            <div class="kpi-label">📦 Pedidos Totales</div>
-                            <div class="kpi-value-row">
-                                <div class="kpi-value">{pedidos_totales:,}</div>
-                                <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
-                            </div>
-                            <div class="kpi-subtext">vs año anterior</div>
-                        </div>""",
-                    unsafe_allow_html=True
-                )
-
-            with col3:
-                color_valor = "kpi-delta-pos" if delta_valor >= 0 else "kpi-delta-neg"
-                flecha = "↑" if delta_valor >= 0 else "↓"
-                st.markdown(
-                    f"""<div class="kpi-card">
-                            <div class="kpi-label">💵 Valor Promedio</div>
-                            <div class="kpi-value-row">
-                                <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
-                                <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
-                            </div>
-                            <div class="kpi-subtext">vs año anterior</div>
-                        </div>""",
-                    unsafe_allow_html=True
-                )
-
-            with col4:
-                color_flete = "kpi-delta-pos" if delta_flete >= 0 else "kpi-delta-neg"
-                flecha = "↑" if delta_flete >= 0 else "↓"
-                st.markdown(
-                    f"""<div class="kpi-card">
-                            <div class="kpi-label">🚚 Flete Promedio</div>
-                            <div class="kpi-value-row">
-                                <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
-                                <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
-                            </div>
-                            <div class="kpi-subtext">vs año anterior</div>
-                        </div>""",
-                    unsafe_allow_html=True
-                )
 
             st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -583,16 +631,16 @@ with tab1:
 
             fig_tendencia = go.Figure()
 
-            # Línea de datos reales
-            if not df_real.empty:
-                fig_tendencia.add_trace(go.Scatter(
-                    x=df_real["MesIndex"],
-                    y=df_real["precio_final"],
-                    mode='lines+markers',
-                    name='Datos reales',
-                    line=dict(color="#3B82F6", width=3),
-                    marker=dict(size=8, color="#3B82F6")
-                ))
+        # Línea de datos reales
+        if not df_real.empty:
+            fig_tendencia.add_trace(go.Scatter(
+                x=df_real["MesIndex"],
+                y=df_real["precio_final"],
+                mode='lines+markers',
+                name='Datos reales',
+                line=dict(color="#001A57", width=3),
+                marker=dict(size=8, color="#3B82F6")
+            ))
 
             # Línea de predicción solo si hay predicción y datos reales
             # Solo mostrar la línea de predicción si los filtros están en "Todas"
@@ -761,13 +809,15 @@ with tab1:
                         feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
                         feature["properties"]["ingresos"] = ingresos_geo
 
-                def style_function(feature):
-                    meso_feat = feature["properties"].get("region", "")
-                    label_feat = feature["properties"].get("percent_label", "0%")
-                    try:
-                        pct_feat = float(label_feat.rstrip("%"))
-                    except (ValueError, AttributeError):
-                        pct_feat = 0.0
+            BASE_RGB = (0, 26, 87)
+
+            def style_function(feature):
+                meso_feat = feature["properties"].get("region", "")
+                label_feat = feature["properties"].get("percent_label", "0%")
+                try:
+                    pct_feat = float(label_feat.rstrip("%"))
+                except (ValueError, AttributeError):
+                    pct_feat = 0.0
 
                     if meso_feat not in all_regions_map:
                         return {
