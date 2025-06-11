@@ -480,8 +480,8 @@ with st.sidebar:
                     df_pred_diaria['fecha'].dt.month.rename('Mes')
                 ]).agg({
                     'prediccion': 'sum',
-                    'pred_rf': 'sum',
-                    'pred_xgb': 'sum'
+                    'pred_min': 'sum',
+                    'pred_max': 'sum'
                 }).reset_index()
                 df_pred_mensual['Tipo'] = "pred"
                 st.success("Predicción mensual generada y cargada.")
@@ -703,12 +703,12 @@ with tab1:
 
             if not df_pred_mensual.empty:
                 df_pred_mensual = df_pred_mensual.rename(columns={'prediccion': 'precio_final'})
-                for col in ['pred_rf', 'pred_xgb']:
+                for col in ['pred_min', 'pred_max']:
                     if col not in df_pred_mensual.columns:
                         df_pred_mensual[col] = np.nan
-                df_pred_plot_total = df_pred_mensual[["Año", "Mes", "precio_final", "pred_rf", "pred_xgb", "Tipo"]]
-                df_mensual['pred_rf'] = np.nan
-                df_mensual['pred_xgb'] = np.nan
+                df_pred_plot_total = df_pred_mensual[["Año", "Mes", "precio_final", "pred_min", "pred_max", "Tipo"]]
+                df_mensual['pred_min'] = np.nan
+                df_mensual['pred_max'] = np.nan
                 df_total = pd.concat([df_mensual, df_pred_plot_total], ignore_index=True)
             else:
                 df_total = df_mensual
@@ -756,8 +756,8 @@ with tab1:
                 last_real_x = df_real["MesIndex"].iloc[-1]
                 last_min = min(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
                 last_max = max(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
-                min_pred = np.minimum(df_pred_plot["pred_rf"], df_pred_plot["pred_xgb"])
-                max_pred = np.maximum(df_pred_plot["pred_rf"], df_pred_plot["pred_xgb"])
+                min_pred = np.minimum(df_pred_plot["pred_min"], df_pred_plot["pred_max"])
+                max_pred = np.maximum(df_pred_plot["pred_min"], df_pred_plot["pred_max"])
                 x_extended = [last_real_x] + df_pred_plot["MesIndex"].tolist()
                 min_extended = [last_min] + min_pred.tolist()
                 max_extended = [last_max] + max_pred.tolist()

@@ -94,8 +94,8 @@ def crear_features_temporales(df):
 
 def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, fechas_pred, df_diario):
     predicciones = []
-    pred_rf_list = []
-    pred_xgb_list = []
+    pred_min_list = []
+    pred_max_list = []
     lags = ultimos_datos.copy()
     ultimo_dia_conocido = df_diario['ds'].max()
     ingresos_mensuales = []
@@ -153,9 +153,9 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
             festivo, quincena, tipo_cambio, inflacion_mensual, evento_especial]
         )
         features_df = pd.DataFrame([features], columns=feature_names)
-        pred_rf = modelos[0].predict(features_df)[0]
-        pred_xgb = modelos[1].predict(features_df)[0]
-        pred = (pred_rf + pred_xgb) / 2
+        pred_min = modelos[0].predict(features_df)[0]
+        pred_max = modelos[1].predict(features_df)[0]
+        pred = (pred_min + pred_max) / 2
         pred_ajustado = float(pred) * 1.2
         if pendiente > 0 and pred_ajustado < (np.mean(lags[-7:]) * 0.8):
             pred_ajustado = np.mean(lags[-7:]) * 1.2
@@ -171,8 +171,8 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
 
 def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, fechas_pred, df_diario):
     predicciones = []
-    pred_rf_list = []
-    pred_xgb_list = []
+    pred_min_list = []
+    pred_max_list = []
     lags = ultimos_datos.copy()
     ultimo_dia_conocido = df_diario['ds'].max()
     ingresos_mensuales = []
@@ -230,9 +230,9 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
             festivo, quincena, tipo_cambio, inflacion_mensual, evento_especial]
         )
         features_df = pd.DataFrame([features], columns=feature_names)
-        pred_rf = modelos[0].predict(features_df)[0]
-        pred_xgb = modelos[1].predict(features_df)[0]
-        pred = (pred_rf + pred_xgb) / 2
+        pred_min = modelos[0].predict(features_df)[0]
+        pred_max = modelos[1].predict(features_df)[0]
+        pred = (pred_min + pred_max) / 2
         pred_ajustado = float(pred) * 1.2
         if pendiente > 0 and pred_ajustado < (np.mean(lags[-7:]) * 0.8):
             pred_ajustado = np.mean(lags[-7:]) * 1.2
@@ -246,16 +246,14 @@ def predecir_mes_con_tendencia_ensemble(modelos, ultimos_datos, feature_names, f
         ruido = np.random.normal(loc=0, scale=std_mes_pasado)
         pred_ajustado = pred_ajustado + ruido
 
-        # --- AJUSTE VISUALIZACIÓN ---
-        pred_rf_ajustado = float(pred_rf) * 1.2 + ruido
-        pred_xgb_ajustado = float(pred_xgb) * 1.2 + ruido
-        # ----------------------------
+        pred_min_ajustado = float(pred_min) * 1.25 + ruido
+        pred_max_ajustado = float(pred_max) * 1.15 + ruido
 
         predicciones.append(pred_ajustado)
-        pred_rf_list.append(pred_rf_ajustado)
-        pred_xgb_list.append(pred_xgb_ajustado)
+        pred_min_list.append(pred_min_ajustado)
+        pred_max_list.append(pred_max_ajustado)
         lags.append(pred_ajustado)
-    return predicciones, pred_rf_list, pred_xgb_list
+    return predicciones, pred_min_list, pred_max_list
 
 def pipeline_prediccion_por_grupo_mes_a_mes(df, columna, nombre_archivo, df_diario_pred):
     grupos = df[columna].dropna().unique()
@@ -476,8 +474,8 @@ def main():
     resultados = pd.DataFrame({
         'fecha': [f.date() for f in fechas_pred_todos],
         'prediccion': predicciones_todas,
-        'pred_rf': rf_preds_todas,
-        'pred_xgb': xgb_preds_todas
+        'pred_min': rf_preds_todas,
+        'pred_max': xgb_preds_todas
     })
     
     output_path = os.path.abspath("prediccion_diaria.parquet")
@@ -486,12 +484,10 @@ def main():
     pipeline_prediccion_por_grupo_mes_a_mes(df, 'region', 'prediccion_region.parquet', resultados)
     pipeline_prediccion_por_grupo_mes_a_mes(df, 'categoria_simplificada', 'prediccion_categoria.parquet', resultados)
 
-    # Cargar archivos de predicción
     df_pred_diaria = pd.read_parquet("prediccion_diaria.parquet")
     df_pred_region = pd.read_parquet("prediccion_region.parquet")
     df_pred_categoria = pd.read_parquet("prediccion_categoria.parquet")
 
-    # Generar alertas comparando real vs predicho
     generar_alertas_con_predicciones(df, df_pred_diaria, df_pred_region, df_pred_categoria)
 
 if __name__ == "__main__":
