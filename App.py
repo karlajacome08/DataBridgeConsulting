@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import calendar
 import subprocess
@@ -52,44 +53,124 @@ BASE_RGB = hex_to_rgb(COLOR_BASE_HEX)
 # --------------------------------------
 # 2. Diálogos (sin cambios)
 # --------------------------------------
-@st.dialog("Optimizar rutas de entrega", width="large")
-def dialog_optimizar_rutas():
-    st.write("### Costo estimado por ruta")
-    categorias1 = ["Ruta A", "Ruta B", "Ruta C"]
-    valores1 = [120, 95, 130]
-    fig1 = px.bar(x=categorias1, y=valores1, labels={'x': 'Ruta', 'y': 'Costo estimado'})
-    fig1.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
-    st.plotly_chart(fig1, use_container_width=True)
-    st.write("Este gráfico ilustra el costo estimado para cada ruta. "
-             "Ajusta las listas 'categorias1' y 'valores1' en el código "
-             "para modificar los datos mostrados.")
+
+@st.dialog(" ", width="large")
+def dialog_caidas_categoria():
+    try:
+        with open("alertas.txt", "r", encoding="utf-8") as f:
+            alertas_texto = f.read()
+    except FileNotFoundError:
+        st.warning("No se encontró el archivo alertas.txt")
+        return
+
+    pat_categoria = re.compile(r"(.+?) bajó ([\d\.]+)%")
+    categorias = []
+    caidas = []
+    for linea in alertas_texto.splitlines():
+        m = pat_categoria.search(linea)
+        if m:
+            categorias.append(m.group(1).strip())
+            caidas.append(float(m.group(2)))
+    df_caidas = pd.DataFrame({"Categoría": categorias, "Caída (%)": caidas})
+
+    if not df_caidas.empty:
+        fig = px.bar(
+            df_caidas, x="Categoría", y="Caída (%)", color="Caída (%)",
+            color_continuous_scale="Blues", title="Caída porcentual por categoría"
+        )
+        fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+        st.plotly_chart(fig, use_container_width=True)
+    st.code(
+        "Categorías con caída de más del 15% en ingreso mensual:\n" +
+        "\n".join([f"{cat} bajó {val:.2f}%" for cat, val in zip(categorias, caidas)]),
+        language="markdown"
+    )
     if st.button("Cerrar"):
         st.rerun()
 
-@st.dialog("Mejorar gestión de stock", width="large")
-def dialog_mejorar_stock():
-    st.write("### Unidades en inventario por producto")
-    categorias2 = ["Producto X", "Producto Y", "Producto Z"]
-    valores2 = [450, 320, 275]
-    fig2 = px.bar(x=categorias2, y=valores2, labels={'x': 'Producto', 'y': 'Unidades en Stock'})
-    fig2.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
-    st.plotly_chart(fig2, use_container_width=True)
-    st.write("Este gráfico muestra la cantidad de unidades en stock para cada producto. "
-             "Modifica 'categorias2' y 'valores2' en el código para actualizar los datos.")
+@st.dialog(" ", width="large")
+def dialog_disminucion_categoria():
+    try:
+        with open("alertas.txt", "r", encoding="utf-8") as f:
+            alertas_texto = f.read()
+    except FileNotFoundError:
+        st.warning("No se encontró el archivo alertas.txt")
+        return
+
+    pat_ingreso = re.compile(r"(.+?) \(([\d\.]+) -> ([\d\.]+), pérdida aprox: \$([\d\.]+)\)")
+    cat_ingreso, ingreso_ini, ingreso_fin, perdida = [], [], [], []
+    for linea in alertas_texto.splitlines():
+        m = pat_ingreso.search(linea)
+        if m:
+            cat_ingreso.append(m.group(1).strip())
+            ingreso_ini.append(float(m.group(2)))
+            ingreso_fin.append(float(m.group(3)))
+            perdida.append(float(m.group(4)))
+    df_perdidas = pd.DataFrame({
+        "Categoría": cat_ingreso,
+        "Ingreso Inicial": ingreso_ini,
+        "Ingreso Final": ingreso_fin,
+        "Pérdida ($)": perdida
+    })
+
+    if not df_perdidas.empty:
+        fig = px.bar(
+            df_perdidas, x="Categoría", y="Pérdida ($)", color="Pérdida ($)",
+            color_continuous_scale="Blues", title="Pérdida monetaria por categoría"
+        )
+        fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+        st.plotly_chart(fig, use_container_width=True)
+    st.code(
+        "Categorías con disminución de ingreso promedio mensual:\n" +
+        "\n".join([
+            f"{cat} ({ini:.2f} -> {fin:.2f}, pérdida aprox: ${perd:,.2f})"
+            for cat, ini, fin, perd in zip(cat_ingreso, ingreso_ini, ingreso_fin, perdida)
+        ]),
+        language="markdown"
+    )
     if st.button("Cerrar"):
         st.rerun()
 
-@st.dialog("Ofertas segmentadas", width="large")
-def dialog_ofertas_segmentadas():
-    st.write("### Tasa de conversión por segmento")
-    segmentos = ["Segmento A", "Segmento B", "Segmento C"]
-    conversiones = [0.12, 0.08, 0.15]
-    fig3 = px.bar(x=segmentos, y=conversiones, labels={'x': 'Segmento', 'y': 'Tasa de conversión'})
-    fig3.update_layout(plot_bgcolor="#FFF", paper_bgcolor="#FFF", margin=dict(l=20, r=20, t=40, b=20))
-    st.plotly_chart(fig3, use_container_width=True)
-    st.write("Este gráfico representa la tasa de conversión por segmento. "
-             "Cambia las listas 'segmentos' y 'conversiones' en el código "
-             "para reflejar tus propios datos.")
+@st.dialog(" ", width="large")
+def dialog_disminucion_region():
+    try:
+        with open("alertas.txt", "r", encoding="utf-8") as f:
+            alertas_texto = f.read()
+    except FileNotFoundError:
+        st.warning("No se encontró el archivo alertas.txt")
+        return
+
+    pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.]+) -> ([\d\.]+), pérdida: \$([\d\.]+)\)")
+    regiones, ingreso_ini, ingreso_fin, perdida = [], [], [], []
+    for linea in alertas_texto.splitlines():
+        m = pat_region.search(linea)
+        if m:
+            regiones.append(m.group(1).strip())
+            ingreso_ini.append(float(m.group(2)))
+            ingreso_fin.append(float(m.group(3)))
+            perdida.append(float(m.group(4)))
+    df_regiones = pd.DataFrame({
+        "Región": regiones,
+        "Ingreso Inicial": ingreso_ini,
+        "Ingreso Final": ingreso_fin,
+        "Pérdida ($)": perdida
+    })
+
+    if not df_regiones.empty:
+        fig = px.bar(
+            df_regiones, x="Región", y="Pérdida ($)", color="Pérdida ($)",
+            color_continuous_scale="Blues", title="Pérdida monetaria por región"
+        )
+        fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+        st.plotly_chart(fig, use_container_width=True)
+    st.code(
+        "Regiones con disminución de ingreso promedio mensual:\n" +
+        "\n".join([
+            f"{reg} ({ini:.2f} -> {fin:.2f}, pérdida: ${perd:,.2f})"
+            for reg, ini, fin, perd in zip(regiones, ingreso_ini, ingreso_fin, perdida)
+        ]),
+        language="markdown"
+    )
     if st.button("Cerrar"):
         st.rerun()
 
@@ -338,19 +419,18 @@ with st.sidebar:
     with st.sidebar:
         col_check1, col_text1 = st.columns([1, 10])
         rec1 = col_check1.checkbox(" ", value=rec_defaults[0], key='rec1')
+        if col_text1.button("Categorías con caída >15%", key="btn_rec1"):
+            dialog_caidas_categoria()
         
-        if col_text1.button("Optimizar rutas de entrega", key="btn_rec1"):
-            dialog_optimizar_rutas()
-
         col_check2, col_text2 = st.columns([1, 10])
         rec2 = col_check2.checkbox(" ", value=rec_defaults[1], key='rec2')
-        if col_text2.button("Mejorar gestión de stock", key="btn_rec2"):
-            dialog_mejorar_stock()
-
+        if col_text2.button("Disminución de ingreso por región", key="btn_rec3"):
+            dialog_disminucion_region()
+        
         col_check3, col_text3 = st.columns([1, 10])
         rec3 = col_check3.checkbox(" ", value=rec_defaults[2], key='rec3')
-        if col_text3.button("Ofertas segmentadas", key="btn_rec3"):
-            dialog_ofertas_segmentadas()
+        if col_text3.button("Disminución de ingreso por categoría", key="btn_rec2"):
+            dialog_disminucion_categoria()
 
     # Título grande antes del uploader
     st.markdown(
@@ -936,6 +1016,83 @@ with tab1:
                 )
 
                 st.plotly_chart(fig_bar, use_container_width=True)
+
+                # ==========================
+                # SECCIÓN: RECOMENDACIONES Y ALERTAS DE INGRESOS
+                # ==========================
+
+                st.markdown(
+                    f"<h4 style='color:{COLOR_PRIMARY}; font-size:1.6rem; margin-top:2.5rem; margin-bottom:1rem;'>"
+                    "🔔 Recomendaciones y Alertas de Ingresos"
+                    "</h4>",
+                    unsafe_allow_html=True
+                )
+
+                # 1. Leer el archivo alertas.txt
+                try:
+                    with open("alertas.txt", "r", encoding="utf-8") as f:
+                        alertas_texto = f.read()
+                except FileNotFoundError:
+                    alertas_texto = "No se encontró el archivo alertas.txt"
+
+                # 2. Parsear caídas porcentuales por categoría
+                pat_categoria = re.compile(r"(.+?) bajó ([\d\.]+)%")
+                categorias = []
+                caidas = []
+                for linea in alertas_texto.splitlines():
+                    m = pat_categoria.search(linea)
+                    if m:
+                        categorias.append(m.group(1).strip())
+                        caidas.append(float(m.group(2)))
+                df_caidas = pd.DataFrame({"Categoría": categorias, "Caída (%)": caidas})
+
+                # 3. Parsear pérdidas monetarias por categoría
+                pat_ingreso = re.compile(r"(.+?) \(([\d\.]+) -> ([\d\.]+), pérdida aprox: \$([\d\.]+)\)")
+                cat_ingreso, ingreso_ini, ingreso_fin, perdida = [], [], [], []
+                for linea in alertas_texto.splitlines():
+                    m = pat_ingreso.search(linea)
+                    if m:
+                        cat_ingreso.append(m.group(1).strip())
+                        ingreso_ini.append(float(m.group(2)))
+                        ingreso_fin.append(float(m.group(3)))
+                        perdida.append(float(m.group(4)))
+                df_perdidas = pd.DataFrame({
+                    "Categoría": cat_ingreso,
+                    "Ingreso Inicial": ingreso_ini,
+                    "Ingreso Final": ingreso_fin,
+                    "Pérdida ($)": perdida
+                })
+
+                # 4. Gráficos de barras
+                import plotly.express as px
+
+                if not df_caidas.empty:
+                    fig_caidas = px.bar(
+                        df_caidas,
+                        x="Categoría",
+                        y="Caída (%)",
+                        color="Caída (%)",
+                        color_continuous_scale="Reds",
+                        title="Caída porcentual de ingreso mensual por categoría"
+                    )
+                    fig_caidas.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+                    st.plotly_chart(fig_caidas, use_container_width=True)
+
+                if not df_perdidas.empty:
+                    fig_perdidas = px.bar(
+                        df_perdidas,
+                        x="Categoría",
+                        y="Pérdida ($)",
+                        color="Pérdida ($)",
+                        color_continuous_scale="Blues",
+                        title="Pérdida monetaria aproximada por categoría"
+                    )
+                    fig_perdidas.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+                    st.plotly_chart(fig_perdidas, use_container_width=True)
+
+                # 5. Mostrar el texto completo de alertas.txt
+                st.markdown("#### Detalle de alertas detectadas")
+                st.code(alertas_texto, language="markdown")
             
             st.markdown("""
             <style>
