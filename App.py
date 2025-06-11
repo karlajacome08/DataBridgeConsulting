@@ -607,7 +607,11 @@ with tab1:
             (flete_promedio_actual - flete_promedio_anterior) / flete_promedio_anterior * 100 
             if flete_promedio_anterior > 0 else 0.0
         )
-
+        comparacion_labels = {
+            "Último año": "vs año anterior",
+            "Últimos 6 meses": "vs mismos 6 meses año anterior",
+            "3 meses": "vs mes anterior",
+        }
         # KPI Cards
         col1, col2, col3, col4 = st.columns(4)
 
@@ -621,6 +625,7 @@ with tab1:
                             <div class="kpi-value">${ingresos_totales:,.0f}</div>
                             <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
                         </div>
+                        <div class="kpi-comparacion">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -635,6 +640,7 @@ with tab1:
                             <div class="kpi-value">{pedidos_totales:,}</div>
                             <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
                         </div>
+                        <div class="kpi-comparacion">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -649,6 +655,7 @@ with tab1:
                             <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
                             <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
                         </div>
+                        <div class="kpi-comparacion">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
@@ -663,6 +670,7 @@ with tab1:
                             <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
                             <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
                         </div>
+                        <div class="kpi-comparacion">{comparacion_labels[periodo_sel]}</div>
                     </div>""",
                 unsafe_allow_html=True
             )
