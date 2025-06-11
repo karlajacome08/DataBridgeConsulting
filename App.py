@@ -465,11 +465,7 @@ with st.sidebar:
             
             if resultado.returncode == 0:
                 st.success("✅ Modelo ejecutado correctamente")
-                st.text("Salida del modelo:")
-                st.code(resultado.stdout, language='bash')
             else:
-                #st.error("❌ Error al ejecutar el modelo")
-                #st.text("Detalles del error:")
                 st.code(resultado.stderr, language='bash')
 
             if os.path.exists("prediccion_diaria.parquet"):
@@ -484,7 +480,6 @@ with st.sidebar:
                     'pred_max': 'sum'
                 }).reset_index()
                 df_pred_mensual['Tipo'] = "pred"
-                st.success("Predicción mensual generada y cargada.")
             else:
                 df_pred_mensual = pd.DataFrame()
                 st.warning("No se generó predicción para el mes siguiente.")
