@@ -54,6 +54,12 @@ BASE_RGB = hex_to_rgb(COLOR_BASE_HEX)
 # 2. Diálogos (sin cambios)
 # --------------------------------------
 
+custom_blue_scale = [
+    [0.0, '#3B82F6'],
+    [0.5, '#1E40AF'],
+    [1.0, '#0B2447']
+]
+
 @st.dialog(" ", width="large")
 def dialog_caidas_categoria():
     try:
@@ -76,7 +82,7 @@ def dialog_caidas_categoria():
     if not df_caidas.empty:
         fig = px.bar(
             df_caidas, x="Categoría", y="Caída (%)", color="Caída (%)",
-            color_continuous_scale="Blues", title="Caída porcentual por categoría"
+            color_continuous_scale=custom_blue_scale, title="Caída porcentual por categoría"
         )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
@@ -116,7 +122,7 @@ def dialog_disminucion_categoria():
     if not df_perdidas.empty:
         fig = px.bar(
             df_perdidas, x="Categoría", y="Pérdida ($)", color="Pérdida ($)",
-            color_continuous_scale="Blues", title="Pérdida monetaria por categoría"
+            color_continuous_scale=custom_blue_scale, title="Pérdida monetaria por categoría"
         )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
@@ -159,7 +165,7 @@ def dialog_disminucion_region():
     if not df_regiones.empty:
         fig = px.bar(
             df_regiones, x="Región", y="Pérdida ($)", color="Pérdida ($)",
-            color_continuous_scale="Blues", title="Pérdida monetaria por región"
+            color_continuous_scale=custom_blue_scale, title="Pérdida monetaria por región"
         )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
@@ -366,8 +372,6 @@ st.markdown(
         unsafe_allow_html=True
         )
 
-
-
 # --------------------
 # Sidebar con filtros y recomendaciones
 # --------------------
@@ -413,7 +417,7 @@ with st.sidebar:
 
     st.markdown(
         f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY}; font-size: 1.4rem;'>"
-        f"Recomendaciones ({progreso_recomendaciones}%)</h4>",
+        f"Alertas ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
 
@@ -641,7 +645,7 @@ with tab1:
             flecha = "↑" if delta_ingresos >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">🏦 Ingresos Totales</div>
+                        <div class="kpi-label">Ingresos Totales</div>
                         <div class="kpi-value-row">
                             <div class="kpi-value">${ingresos_totales:,.0f}</div>
                             <div class="{color_ingresos}">{abs(delta_ingresos):.1f}% {flecha}</div>
@@ -656,7 +660,7 @@ with tab1:
             flecha = "↑" if delta_pedidos >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">📦 Pedidos Totales</div>
+                        <div class="kpi-label">Pedidos Totales</div>
                         <div class="kpi-value-row">
                             <div class="kpi-value">{pedidos_totales:,}</div>
                             <div class="{color_pedidos}">{abs(delta_pedidos):.1f}% {flecha}</div>
@@ -671,7 +675,7 @@ with tab1:
             flecha = "↑" if delta_valor >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">💵 Valor Promedio</div>
+                        <div class="kpi-label">Valor Promedio</div>
                         <div class="kpi-value-row">
                             <div class="kpi-value">${valor_promedio_actual:,.2f}</div>
                             <div class="{color_valor}">{abs(delta_valor):.1f}% {flecha}</div>
@@ -686,7 +690,7 @@ with tab1:
             flecha = "↑" if delta_flete >= 0 else "↓"
             st.markdown(
                 f"""<div class="kpi-card">
-                        <div class="kpi-label">🚚 Flete Promedio</div>
+                        <div class="kpi-label">Flete Promedio</div>
                         <div class="kpi-value-row">
                             <div class="kpi-value">${flete_promedio_actual:,.2f}</div>
                             <div class="{color_flete}">{abs(delta_flete):.1f}% {flecha}</div>
@@ -1045,47 +1049,6 @@ with tab1:
                 )
 
                 st.plotly_chart(fig_bar, use_container_width=True)
-                
-            
-
-                # ==========================
-                # SECCIÓN: RECOMENDACIONES Y ALERTAS DE INGRESOS
-                # ==========================
-            
-            st.markdown("""
-            <style>
-            #sugerencia-btn {
-                position: fixed;
-                bottom: 36px;
-                right: 48px;
-                z-index: 9999;
-            }
-            #sugerencia-btn button {
-                background: #001A57;
-                color: #fff;
-                border: none;
-                border-radius: 50px;
-                box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-                padding: 18px 26px 18px 22px;
-                font-size: 1.35rem;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                cursor: pointer;
-                transition: background 0.2s;
-            }
-            #sugerencia-btn button:hover {
-                background: #173b7b;
-            }
-            </style>
-            <div id="sugerencia-btn">
-            <button onclick="window.alert('¡Aquí irán las sugerencias del socio formador!')">
-                <span style="font-size:1.65rem;">👩‍💼</span>
-                <span>Sugerencias</span>
-            </button>
-            </div>
-            """, unsafe_allow_html=True)
 
     else:
         st.info("Sube tu base de datos para ver las métricas filtradas")
@@ -1093,7 +1056,7 @@ with tab1:
         col1, col2, col3, col4 = st.columns(4)
         for col, label in zip(
             [col1, col2, col3, col4],
-            ["🏦 Ingresos Totales", "📦 Pedidos Totales", "💵 Valor Promedio", "🚚 Flete Promedio"]
+            ["Ingresos Totales", "Pedidos Totales", "Valor Promedio", "Flete Promedio"]
         ):
             with col:
                 st.markdown(
@@ -1223,32 +1186,66 @@ with tab2:
                 unsafe_allow_html=True
             )
 
+        # # =======================
+        # # 2.1. NUEVAS CARDS DE INGRESOS POR REGIÓN Y CATEGORÍA
+        # # =======================
+
+        # # ---- Ingresos por Región ----
+        # df_region = pd.read_parquet("prediccion_region.parquet")
+        # df_region['fecha'] = pd.to_datetime(df_region['fecha'])
+        # df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
+        # ingresos_region_total = df_region.groupby('region')['prediccion'].sum().sort_values(ascending=False)
+        # ingresos_region_mes = df_region.groupby(['region', 'mes'])['prediccion'].sum().unstack(fill_value=0)
+        # ingresos_region_mes['Total'] = ingresos_region_mes.sum(axis=1)
+
+        # # ---- Ingresos por Categoría ----
+        # df_categoria = pd.read_parquet("prediccion_categoria.parquet")
+        # df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
+        # df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
+        # ingresos_categoria_total = df_categoria.groupby('categoria_simplificada')['prediccion'].sum().sort_values(ascending=False)
+        # ingresos_categoria_mes = df_categoria.groupby(['categoria_simplificada', 'mes'])['prediccion'].sum().unstack(fill_value=0)
+        # ingresos_categoria_mes['Total'] = ingresos_categoria_mes.sum(axis=1)
+
+        # col4, col5 = st.columns(2)
+        # with col4:
+        #     st.markdown(
+        #         f"""
+        #         <div class="kpi-card">
+        #             <div class="kpi-label">Ingresos por Región</div>
+        #             <div class="kpi-value">${ingresos_region_total.sum():,.0f}</div>
+        #             <div class="kpi-subtext">Total 2 meses</div>
+        #         </div>
+        #         """,
+        #         unsafe_allow_html=True
+        #     )
+
+        # with col5:
+        #     st.markdown(
+        #         f"""
+        #         <div class="kpi-card">
+        #             <div class="kpi-label">Ingresos por Categoría</div>
+        #             <div class="kpi-value">${ingresos_categoria_total.sum():,.0f}</div>
+        #             <div class="kpi-subtext">Total 2 meses</div>
+        #         </div>
+        #         """,
+        #         unsafe_allow_html=True
+        #     )
+
+        # # =======================
+        # # 3. GRÁFICA DIARIA COMPARATIVA
         # =======================
-        # 3. GRÁFICA DIARIA COMPARATIVA
-        # =======================
-        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Predicción Diaria por Mes</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Predicción Diaria Total</h4>", unsafe_allow_html=True)
         if not df_diario.empty and 'prediccion' in df_diario.columns:
+            df_diario = df_diario.sort_values('fecha')
             fig_diario = go.Figure()
-            df_mes1 = df_diario[df_diario['mes'] == primer_mes_str]
-            df_mes2 = df_diario[df_diario['mes'] == segundo_mes_str]
-            if not df_mes1.empty:
-                fig_diario.add_trace(go.Scatter(
-                    x=df_mes1['fecha'],
-                    y=df_mes1['prediccion'],
-                    mode='lines+markers',
-                    name=f'{primer_mes_str}',
-                    line=dict(color='#3B82F6', width=3),
-                    marker=dict(size=6, color='#3B82F6')
-                ))
-            if not df_mes2.empty:
-                fig_diario.add_trace(go.Scatter(
-                    x=df_mes2['fecha'],
-                    y=df_mes2['prediccion'],
-                    mode='lines+markers',
-                    name=f'{segundo_mes_str}',
-                    line=dict(color='#FBD43C', width=3),
-                    marker=dict(size=6, color='#FBD43C')
-                ))
+            fig_diario.add_trace(go.Scatter(
+                x=df_diario['fecha'],
+                y=df_diario['prediccion'],
+                mode='lines+markers',
+                name='Predicción Diaria Total',
+                line=dict(color='#2563EB', width=3),
+                marker=dict(size=6, color='#2563EB')
+            ))
             fig_diario.update_layout(
                 height=400,
                 plot_bgcolor="#FFF",
@@ -1257,13 +1254,7 @@ with tab2:
                 yaxis_title="Ingresos Diarios ($)",
                 margin=dict(l=10, r=10, t=40, b=30),
                 font=dict(family="sans-serif", color="#222", size=14),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="center",
-                    x=0.5
-                )
+                showlegend=False
             )
             st.plotly_chart(fig_diario, use_container_width=True)
         else:
@@ -1276,12 +1267,11 @@ with tab2:
         df_region = pd.read_parquet("prediccion_region.parquet")
         df_region['fecha'] = pd.to_datetime(df_region['fecha'])
         df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
-        regiones_completas = sorted(df_region['region'].unique())
         df_region_pivot = df_region.groupby(['mes', 'region'])['prediccion'].sum().unstack(fill_value=0)
-        for region in regiones_completas:
-            if region not in df_region_pivot.columns:
-                df_region_pivot[region] = 0
-        df_region_pivot = df_region_pivot[regiones_completas]
+
+        total_region = df_region_pivot.sum(axis=0).sort_values(ascending=False)
+        df_region_pivot = df_region_pivot[total_region.index]
+
         meses_region = sorted(df_region_pivot.index)
         if len(meses_region) >= 2:
             primer_mes_region = meses_region[0]
@@ -1299,7 +1289,7 @@ with tab2:
                 x=df_region_pivot.columns,
                 y=df_region_pivot.loc[segundo_mes_region],
                 name=f'{segundo_mes_region}',
-                marker_color='#FBD43C',
+                marker_color='#1E40AF',
                 text=df_region_pivot.loc[segundo_mes_region].apply(lambda x: f'${x:,.0f}'),
                 textposition='outside'
             ))
@@ -1324,12 +1314,11 @@ with tab2:
         df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
         df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
         col_categoria = 'categoria_simplificada'
-        categorias_completas = sorted(df_categoria[col_categoria].unique())
         df_categoria_pivot = df_categoria.groupby(['mes', col_categoria])['prediccion'].sum().unstack(fill_value=0)
-        for c in categorias_completas:
-            if c not in df_categoria_pivot.columns:
-                df_categoria_pivot[c] = 0
-        df_categoria_pivot = df_categoria_pivot[categorias_completas]
+
+        total_categoria = df_categoria_pivot.sum(axis=0).sort_values(ascending=False)
+        df_categoria_pivot = df_categoria_pivot[total_categoria.index]
+
         meses_cat = sorted(df_categoria_pivot.index)
         if len(meses_cat) >= 2:
             primer_mes_cat = meses_cat[0]
@@ -1347,7 +1336,7 @@ with tab2:
                 x=df_categoria_pivot.columns,
                 y=df_categoria_pivot.loc[segundo_mes_cat],
                 name=f'{segundo_mes_cat}',
-                marker_color='#FBD43C',
+                marker_color='#1E40AF',
                 text=df_categoria_pivot.loc[segundo_mes_cat].apply(lambda x: f'${x:,.0f}'),
                 textposition='outside'
             ))
