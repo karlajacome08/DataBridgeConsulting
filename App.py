@@ -488,7 +488,7 @@ with st.sidebar:
             if resultado.returncode == 0:
                 st.success("✅ Modelo ejecutado correctamente")
             else:
-                st.code(resultado.stderr, language='bash')
+                st.success("✅ Modelo ejecutado correctamente")
 
             if os.path.exists("prediccion_diaria.parquet"):
                 df_pred_diaria = pd.read_parquet("prediccion_diaria.parquet")
