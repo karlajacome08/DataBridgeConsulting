@@ -60,7 +60,7 @@ def dialog_caidas_categoria():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró ninguna Alerta")
+        st.warning("No se encontró el archivo alertas.txt")
         return
 
     pat_categoria = re.compile(r"(.+?) bajó ([\d\.]+)%")
@@ -94,7 +94,7 @@ def dialog_disminucion_categoria():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró ninguna Alerta")
+        st.warning("No se encontró el archivo alertas.txt")
         return
 
     pat_ingreso = re.compile(r"(.+?) \(([\d\.]+) -> ([\d\.]+), pérdida aprox: \$([\d\.]+)\)")
@@ -137,7 +137,7 @@ def dialog_disminucion_region():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró ninguna Alerta")
+        st.warning("No se encontró el archivo alertas.txt")
         return
 
     pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.]+) -> ([\d\.]+), pérdida: \$([\d\.]+)\)")
@@ -383,6 +383,7 @@ with st.sidebar:
 
     if 'df' in st.session_state:
         df_filtros = st.session_state['df'].copy()
+        df_filtros = df_filtros.reset_index()
         df_filtros['orden_compra_timestamp'] = pd.to_datetime(df_filtros['orden_compra_timestamp'], errors='coerce')
         df_filtros = df_filtros.dropna(subset=['orden_compra_timestamp'])
 
@@ -412,7 +413,7 @@ with st.sidebar:
 
     st.markdown(
         f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY}; font-size: 1.4rem;'>"
-        f"Alertas ({progreso_recomendaciones}%)</h4>",
+        f"Recomendaciones ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
 
@@ -445,14 +446,31 @@ with st.sidebar:
     if uploaded_file is not None:
         try:
             file_extension = uploaded_file.name.split(".")[-1].lower()
+            usecols = [
+                'orden_compra_timestamp', 'region', 'categoria_simplificada', 
+                'precio_final', 'costo_de_flete', 'order_id'
+            ]
+            dtype = {
+                'region': 'category',
+                'categoria_simplificada': 'category'
+            }
+            # Carga eficiente solo columnas necesarias
             if file_extension == "csv":
-                df = pd.read_csv(uploaded_file)
+                df = pd.read_csv(uploaded_file, usecols=usecols, dtype=dtype)
             elif file_extension in ["xlsx", "xls"]:
-                df = pd.read_excel(uploaded_file)
+                df = pd.read_excel(uploaded_file, usecols=usecols, dtype=dtype)
             elif file_extension == "parquet":
-                df = pd.read_parquet(uploaded_file)
+                df = pd.read_parquet(uploaded_file, columns=usecols).astype(dtype)
             else:
-                df = pd.read_csv(uploaded_file, sep=None, engine='python')
+                df = pd.read_csv(uploaded_file, sep=None, engine='python', usecols=usecols, dtype=dtype)
+                
+            # Preprocesamiento crítico
+            df = df.reset_index()
+            #df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
+            df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'])
+            df = df.set_index('orden_compra_timestamp')  # Índice para filtrado rápido
+            
+            # Guardar parquet optimizado
             df.to_parquet("df_DataBridgeConsulting.parquet", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
@@ -492,15 +510,20 @@ with st.sidebar:
 # --------------------
 # Función de filtrado
 # --------------------
+@st.cache_data(ttl=3600, show_spinner="Aplicando filtros...")
 def aplicar_filtros(df, periodo, region, categoria):
     df_filtrado = df.copy()
+
+    # Si necesitas trabajar con la columna, resetea el índice:
+    df_filtrado = df_filtrado.reset_index()  # Ahora 'orden_compra_timestamp' es columna
+
+    # Ya puedes hacer operaciones con la columna:
     df_filtrado['orden_compra_timestamp'] = pd.to_datetime(df_filtrado['orden_compra_timestamp'], errors='coerce')
     df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
-    
+
     fecha_max = df_filtrado['orden_compra_timestamp'].max()
 
-
-    # Nuevas condiciones para los periodos
+    # Filtrado por periodo
     if periodo == "Último año":
         fecha_limite = fecha_max - pd.DateOffset(years=1)
     elif periodo == "Últimos 6 meses":
@@ -508,17 +531,17 @@ def aplicar_filtros(df, periodo, region, categoria):
     elif periodo == "Últimos 3 meses":
         fecha_limite = fecha_max - pd.DateOffset(months=3)
     else:
-        fecha_limite = fecha_max - pd.DateOffset(years=100)  # Todos los datos
+        fecha_limite = fecha_max - pd.DateOffset(years=100)
 
     df_filtrado = df_filtrado[df_filtrado['orden_compra_timestamp'] >= fecha_limite]
 
     if region != "Todas las regiones":
         df_filtrado = df_filtrado[df_filtrado['region'] == region]
-
     if categoria != "Todas las categorías":
         df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
 
-    return df_filtrado
+    return df_filtrado  # Ya no necesitas reset_index aquí, ya es columna
+
 
 
 # --------------------
@@ -550,6 +573,7 @@ with tab1:
 
         # 3. Filtrar datos del año anterior CON LOS MISMOS FILTROS
         df_anterior = st.session_state['df'].copy()
+        df_anterior = df_anterior.reset_index()  # <--- AGREGA ESTA LÍNEA
         df_anterior['orden_compra_timestamp'] = pd.to_datetime(df_anterior['orden_compra_timestamp'])
         df_anterior = df_anterior[
             (df_anterior['orden_compra_timestamp'] >= fecha_min_anterior) & 
@@ -605,7 +629,7 @@ with tab1:
         comparacion_labels = {
             "Último año": "vs año anterior",
             "Últimos 6 meses": "vs mismos 6 meses año anterior",
-            "3 meses": "vs mes anterior",
+            "Últimos 3 meses": "vs mes anterior",
         }
         # KPI Cards
         col1, col2, col3, col4 = st.columns(4)
@@ -1362,7 +1386,6 @@ with tab2:
         1. Sube tu base de datos en el panel izquierdo
         2. Espera a que se procesen los archivos de predicción
         """)
-
 
 with tab3:
     st.markdown("<div id='panel-individual'></div>", unsafe_allow_html=True)
