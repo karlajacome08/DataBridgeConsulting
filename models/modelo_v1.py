@@ -319,12 +319,14 @@ def pipeline_prediccion_por_grupo_mes_a_mes(df, columna, nombre_archivo, df_diar
 
     if resultados_todos:
         df_final = pd.concat(resultados_todos, ignore_index=True)
+        df_final['prediccion'] = df_final['prediccion'].clip(lower=1)
         df_total_diario = df_diario_pred[df_diario_pred['fecha'].isin(df_final['fecha'])]
         df_merged = df_final.merge(df_total_diario, on='fecha', suffixes=('', '_total'))
         df_sum = df_merged.groupby('fecha')['prediccion'].sum().reset_index()
         df_merged = df_merged.merge(df_sum, on='fecha', suffixes=('', '_sum'))
         df_merged['factor_ajuste'] = df_merged['prediccion_total'] / df_merged['prediccion_sum']
         df_merged['prediccion'] = df_merged['prediccion'] * df_merged['factor_ajuste']
+        df_merged['prediccion'] = df_merged['prediccion'].clip(lower=1)
         df_final = df_merged[['fecha', columna, 'prediccion']]
         output_path = os.path.abspath(nombre_archivo)
         df_final.to_parquet(output_path, engine="pyarrow", compression="snappy", index=False)
