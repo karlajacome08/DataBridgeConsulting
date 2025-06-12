@@ -763,7 +763,11 @@ with tab1:
             # Solo mostrar la línea de predicción si los filtros están en "Todas"
             mostrar_prediccion = (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías")
             
+            alerta_activada = rec1 or rec2 or rec3
+            num_checks = sum([rec1, rec2, rec3])
+
             if mostrar_prediccion and not df_pred_plot.empty and not df_real.empty:
+                # Línea de predicción (existente)
                 fig_tendencia.add_trace(go.Scatter(
                     x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
                     y=[df_real["precio_final"].iloc[-1]] + df_pred_plot["precio_final"].tolist(),
@@ -775,6 +779,46 @@ with tab1:
                         color=['#7B3FF2'] + ['#555555'] * len(df_pred_plot)
                     )
                 ))
+                
+                # Línea de alerta modificada (nuevo)
+                if alerta_activada:
+                    # Calcular segmentos proporcionales
+                    total_meses = len(df_pred_plot)
+                    tercios = [int(np.ceil(total_meses / 3 * i)) for i in range(1, 4)]
+                    meses_a_mostrar = tercios[num_checks - 1] if num_checks > 0 else 0
+                    
+                    # Construir coordenadas
+                    x_alerta = [df_real["MesIndex"].iloc[-1]]
+                    y_alerta = [df_real["precio_final"].iloc[-1]]  # Mantiene conexión con dato real
+                    
+                    # Agregar puntos aumentados 5% para el segmento correspondiente
+                    for i, (mes, valor) in enumerate(zip(df_pred_plot["MesIndex"], df_pred_plot["precio_final"])):
+                        if i < meses_a_mostrar:
+                            y_alerta.append(valor * 1.05)
+                            x_alerta.append(mes)
+                    
+                    # Añadir traza solo si hay segmento que mostrar
+                    if len(x_alerta) > 1:
+                        fig_tendencia.add_trace(go.Scatter(
+                            x=x_alerta,
+                            y=y_alerta,
+                            mode='lines+markers',
+                            name=f'Alerta +5% ({num_checks}/3)',
+                            line=dict(
+                                color='#38A86F',  # Verde intenso
+                                width=3,
+                                dash='solid'
+                            ),
+                            marker=dict(
+                                size=8,
+                                color=COLOR_PRIMARY,  # Color principal del dashboard
+                                symbol='diamond'
+                            ),
+                            connectgaps=True,
+                            showlegend=True
+                        ))
+
+
 
                 last_real_x = df_real["MesIndex"].iloc[-1]
                 last_min = min(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
