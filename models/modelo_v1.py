@@ -378,10 +378,9 @@ def generar_alertas_con_predicciones(df_real, df_pred_diaria, df_pred_region, df
         if pred_row.empty or volumen_cat_mensual == 0:
             continue
         ingreso_pred_mensual = float(pred_row['ingreso_pred_2m'].values[0]) / 2 if float(pred_row['pedidos_2m'].values[0]) > 0 else 0
-        perdida_cat = (ingreso_real_mensual - ingreso_pred_mensual) * volumen_cat_mensual * 2
-        if ingreso_pred_mensual < ingreso_real_mensual and perdida_cat > 0:
+        if ingreso_pred_mensual < ingreso_real_mensual:
             alertas_cat.append(
-                f"{cat} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f}, pérdida aprox: ${perdida_cat:.2f})"
+                f"{cat} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f})"
             )
     if alertas_cat:
         alerta_cat = "Categorías con disminución de ingreso promedio mensual:\n" + "\n".join(alertas_cat)
@@ -406,10 +405,9 @@ def generar_alertas_con_predicciones(df_real, df_pred_diaria, df_pred_region, df
         if pred_row.empty or volumen_reg_mensual == 0:
             continue
         ingreso_pred_mensual = float(pred_row['ingreso_pred_2m'].values[0]) / 2 if float(pred_row['pedidos_2m'].values[0]) > 0 else 0
-        perdida_reg = (ingreso_real_mensual - ingreso_pred_mensual) * volumen_reg_mensual * 2
-        if ingreso_pred_mensual < ingreso_real_mensual and perdida_reg > 0:
+        if ingreso_pred_mensual < ingreso_real_mensual:
             alertas_reg.append(
-                f"{reg} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f}, pérdida: ${perdida_reg:.2f})"
+                f"{reg} ({ingreso_real_mensual:.2f} -> {ingreso_pred_mensual:.2f})"
             )
     if alertas_reg:
         alerta_reg = "Regiones con disminución de ingreso promedio mensual:\n" + "\n".join(alertas_reg)
