@@ -460,17 +460,19 @@ with st.sidebar:
             elif file_extension in ["xlsx", "xls"]:
                 df = pd.read_excel(uploaded_file, usecols=usecols, dtype=dtype)
             elif file_extension == "parquet":
-                df = pd.read_parquet(uploaded_file, columns=usecols).astype(dtype)
+                df = pd.read_parquet(uploaded_file, columns=usecols)
+                df = df.astype(dtype)
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python', usecols=usecols, dtype=dtype)
-                
+
             # Preprocesamiento crítico
-            df = df.reset_index()
-            #df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
-            df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'])
-            df = df.set_index('orden_compra_timestamp')  # Índice para filtrado rápido
-            
-            # Guardar parquet optimizado
+            df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
+            df = df.dropna(subset=['orden_compra_timestamp'])
+
+            # NO establecer 'orden_compra_timestamp' como índice aquí
+            # NO hacer reset_index() aquí
+
+            # Guardar parquet optimizado sin índice
             df.to_parquet("df_DataBridgeConsulting.parquet", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
