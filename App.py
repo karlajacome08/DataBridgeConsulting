@@ -464,19 +464,17 @@ with st.sidebar:
             elif file_extension in ["xlsx", "xls"]:
                 df = pd.read_excel(uploaded_file, usecols=usecols, dtype=dtype)
             elif file_extension == "parquet":
-                df = pd.read_parquet(uploaded_file, columns=usecols)
-                df = df.astype(dtype)
+                df = pd.read_parquet(uploaded_file, columns=usecols).astype(dtype)
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python', usecols=usecols, dtype=dtype)
-
+                
             # Preprocesamiento crítico
-            df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
-            df = df.dropna(subset=['orden_compra_timestamp'])
-
-            # NO establecer 'orden_compra_timestamp' como índice aquí
-            # NO hacer reset_index() aquí
-
-            # Guardar parquet optimizado sin índice
+            df = df.reset_index()
+            #df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
+            df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'])
+            df = df.set_index('orden_compra_timestamp')  # Índice para filtrado rápido
+            
+            # Guardar parquet optimizado
             df.to_parquet("df_DataBridgeConsulting.parquet", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
@@ -1128,255 +1126,247 @@ with tab2:
     all_files_exist = all(os.path.exists(f) for f in parquet_files)
     base_subida = 'df' in st.session_state  # Verifica si se subió el archivo principal
 
-    if all_files_exist and base_subida:
         # =======================
         # 1. PREDICCIÓN DIARIA
         # =======================
-        df_diario = pd.read_parquet("prediccion_diaria.parquet")
-        df_diario['fecha'] = pd.to_datetime(df_diario['fecha'])
-        df_diario['mes'] = df_diario['fecha'].dt.to_period('M').astype(str)
-        meses_disponibles = sorted(df_diario['mes'].unique())
-        if len(meses_disponibles) >= 2:
-            primer_mes_str = meses_disponibles[0]
-            segundo_mes_str = meses_disponibles[1]
-            mes1 = df_diario[df_diario['mes'] == primer_mes_str]['prediccion'].sum()
-            mes2 = df_diario[df_diario['mes'] == segundo_mes_str]['prediccion'].sum()
-        else:
-            primer_mes_str = meses_disponibles[0] if meses_disponibles else "N/A"
-            segundo_mes_str = "N/A"
-            mes1 = df_diario['prediccion'].sum()
-            mes2 = 0
-        total = mes1 + mes2
-
-        # =======================
-        # 2. TOP CARDS
-        # =======================
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown(
-                f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Predicción 2 meses</div>
-                    <div class="kpi-value">${total:,.0f}</div>
-                    <div class="kpi-subtext">{primer_mes_str} + {segundo_mes_str}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with col2:
-            st.markdown(
-                f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Primer Mes</div>
-                    <div class="kpi-value">${mes1:,.0f}</div>
-                    <div class="kpi-subtext">{primer_mes_str}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-        with col3:
-            st.markdown(
-                f"""
-                <div class="kpi-card">
-                    <div class="kpi-label">Segundo Mes</div>
-                    <div class="kpi-value">${mes2:,.0f}</div>
-                    <div class="kpi-subtext">{segundo_mes_str}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-        # # =======================
-        # # 2.1. NUEVAS CARDS DE INGRESOS POR REGIÓN Y CATEGORÍA
-        # # =======================
-
-        # # ---- Ingresos por Región ----
-        # df_region = pd.read_parquet("prediccion_region.parquet")
-        # df_region['fecha'] = pd.to_datetime(df_region['fecha'])
-        # df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
-        # ingresos_region_total = df_region.groupby('region')['prediccion'].sum().sort_values(ascending=False)
-        # ingresos_region_mes = df_region.groupby(['region', 'mes'])['prediccion'].sum().unstack(fill_value=0)
-        # ingresos_region_mes['Total'] = ingresos_region_mes.sum(axis=1)
-
-        # # ---- Ingresos por Categoría ----
-        # df_categoria = pd.read_parquet("prediccion_categoria.parquet")
-        # df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
-        # df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
-        # ingresos_categoria_total = df_categoria.groupby('categoria_simplificada')['prediccion'].sum().sort_values(ascending=False)
-        # ingresos_categoria_mes = df_categoria.groupby(['categoria_simplificada', 'mes'])['prediccion'].sum().unstack(fill_value=0)
-        # ingresos_categoria_mes['Total'] = ingresos_categoria_mes.sum(axis=1)
-
-        # col4, col5 = st.columns(2)
-        # with col4:
-        #     st.markdown(
-        #         f"""
-        #         <div class="kpi-card">
-        #             <div class="kpi-label">Ingresos por Región</div>
-        #             <div class="kpi-value">${ingresos_region_total.sum():,.0f}</div>
-        #             <div class="kpi-subtext">Total 2 meses</div>
-        #         </div>
-        #         """,
-        #         unsafe_allow_html=True
-        #     )
-
-        # with col5:
-        #     st.markdown(
-        #         f"""
-        #         <div class="kpi-card">
-        #             <div class="kpi-label">Ingresos por Categoría</div>
-        #             <div class="kpi-value">${ingresos_categoria_total.sum():,.0f}</div>
-        #             <div class="kpi-subtext">Total 2 meses</div>
-        #         </div>
-        #         """,
-        #         unsafe_allow_html=True
-        #     )
-
-        # # =======================
-        # # 3. GRÁFICA DIARIA COMPARATIVA
-        # =======================
-        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Predicción Diaria Total</h4>", unsafe_allow_html=True)
-        if not df_diario.empty and 'prediccion' in df_diario.columns:
-            df_diario = df_diario.sort_values('fecha')
-            fig_diario = go.Figure()
-            fig_diario.add_trace(go.Scatter(
-                x=df_diario['fecha'],
-                y=df_diario['prediccion'],
-                mode='lines+markers',
-                name='Predicción Diaria Total',
-                line=dict(color='#2563EB', width=3),
-                marker=dict(size=6, color='#2563EB')
-            ))
-            fig_diario.update_layout(
-                height=400,
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF",
-                xaxis_title="Fecha",
-                yaxis_title="Ingresos Diarios ($)",
-                margin=dict(l=10, r=10, t=40, b=30),
-                font=dict(family="sans-serif", color="#222", size=14),
-                showlegend=False
-            )
-            st.plotly_chart(fig_diario, use_container_width=True)
-        else:
-            st.error("No se pueden cargar los datos de predicción diaria")
-
-        # =======================
-        # 4. GRÁFICA DE DOBLE BARRA POR REGIÓN
-        # =======================
-        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo Regional Mensual</h4>", unsafe_allow_html=True)
-        df_region = pd.read_parquet("prediccion_region.parquet")
-        df_region['fecha'] = pd.to_datetime(df_region['fecha'])
-        df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
-        df_region_pivot = df_region.groupby(['mes', 'region'])['prediccion'].sum().unstack(fill_value=0)
-
-        total_region = df_region_pivot.sum(axis=0).sort_values(ascending=False)
-        df_region_pivot = df_region_pivot[total_region.index]
-
-        meses_region = sorted(df_region_pivot.index)
-        if len(meses_region) >= 2:
-            primer_mes_region = meses_region[0]
-            segundo_mes_region = meses_region[1]
-            fig_region = go.Figure()
-            fig_region.add_trace(go.Bar(
-                x=df_region_pivot.columns,
-                y=df_region_pivot.loc[primer_mes_region],
-                name=f'{primer_mes_region}',
-                marker_color='#3B82F6',
-                text=df_region_pivot.loc[primer_mes_region].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ))
-            fig_region.add_trace(go.Bar(
-                x=df_region_pivot.columns,
-                y=df_region_pivot.loc[segundo_mes_region],
-                name=f'{segundo_mes_region}',
-                marker_color='#1E40AF',
-                text=df_region_pivot.loc[segundo_mes_region].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ))
-            fig_region.update_layout(
-                barmode='group',
-                height=400,
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF",
-                xaxis_title="Región",
-                yaxis_title="Ingresos ($)",
-                margin=dict(l=10, r=10, t=40, b=30),
-                xaxis=dict(tickangle=45),
-                font=dict(family="sans-serif", color="#222", size=14)
-            )
-            st.plotly_chart(fig_region, use_container_width=True)
-
-        # =======================
-        # 5. GRÁFICA DE DOBLE BARRA POR CATEGORÍA
-        # =======================
-        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo por Categoría</h4>", unsafe_allow_html=True)
-        df_categoria = pd.read_parquet("prediccion_categoria.parquet")
-        df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
-        df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
-        col_categoria = 'categoria_simplificada'
-        df_categoria_pivot = df_categoria.groupby(['mes', col_categoria])['prediccion'].sum().unstack(fill_value=0)
-
-        total_categoria = df_categoria_pivot.sum(axis=0).sort_values(ascending=False)
-        df_categoria_pivot = df_categoria_pivot[total_categoria.index]
-
-        meses_cat = sorted(df_categoria_pivot.index)
-        if len(meses_cat) >= 2:
-            primer_mes_cat = meses_cat[0]
-            segundo_mes_cat = meses_cat[1]
-            fig_cat = go.Figure()
-            fig_cat.add_trace(go.Bar(
-                x=df_categoria_pivot.columns,
-                y=df_categoria_pivot.loc[primer_mes_cat],
-                name=f'{primer_mes_cat}',
-                marker_color='#3B82F6',
-                text=df_categoria_pivot.loc[primer_mes_cat].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ))
-            fig_cat.add_trace(go.Bar(
-                x=df_categoria_pivot.columns,
-                y=df_categoria_pivot.loc[segundo_mes_cat],
-                name=f'{segundo_mes_cat}',
-                marker_color='#1E40AF',
-                text=df_categoria_pivot.loc[segundo_mes_cat].apply(lambda x: f'${x:,.0f}'),
-                textposition='outside'
-            ))
-            fig_cat.update_layout(
-                barmode='group',
-                height=400,
-                plot_bgcolor="#FFF",
-                paper_bgcolor="#FFF",
-                xaxis_title="Categoría",
-                yaxis_title="Ingresos ($)",
-                margin=dict(l=10, r=10, t=40, b=30),
-                xaxis=dict(tickangle=45),
-                font=dict(family="sans-serif", color="#222", size=14)
-            )
-            st.plotly_chart(fig_cat, use_container_width=True)
-
-        # =======================
-        # 6. VISUALIZADOR DE ARCHIVOS PARQUET
-        # =======================
-        st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Visualizador de Archivos</h4>", unsafe_allow_html=True)
-        archivos = [
-            ("Predicción Diaria", "prediccion_diaria.parquet"),
-            ("Predicción por Región", "prediccion_region.parquet"),
-            ("Predicción por Categoría", "prediccion_categoria.parquet"),
-        ]
-        opcion_sel = st.selectbox("Selecciona el archivo a visualizar", 
-                                [nombre for nombre, _ in archivos], 
-                                key="parquet_selector_pred")
-        archivo_seleccionado = dict(archivos)[opcion_sel]
-        
-        if os.path.exists(archivo_seleccionado):
-            df_viz = pd.read_parquet(archivo_seleccionado)
-            st.dataframe(df_viz, use_container_width=True, hide_index=True)
-
+    df_diario = pd.read_parquet("prediccion_diaria.parquet")
+    df_diario['fecha'] = pd.to_datetime(df_diario['fecha'])
+    df_diario['mes'] = df_diario['fecha'].dt.to_period('M').astype(str)
+    meses_disponibles = sorted(df_diario['mes'].unique())
+    if len(meses_disponibles) >= 2:
+        primer_mes_str = meses_disponibles[0]
+        segundo_mes_str = meses_disponibles[1]
+        mes1 = df_diario[df_diario['mes'] == primer_mes_str]['prediccion'].sum()
+        mes2 = df_diario[df_diario['mes'] == segundo_mes_str]['prediccion'].sum()
     else:
-        st.info("""
-        **⚠️ Para ver las predicciones:**
-        1. Sube tu base de datos en el panel izquierdo
-        2. Espera a que se procesen los archivos de predicción
-        """)
+        primer_mes_str = meses_disponibles[0] if meses_disponibles else "N/A"
+        segundo_mes_str = "N/A"
+        mes1 = df_diario['prediccion'].sum()
+        mes2 = 0
+    total = mes1 + mes2
+
+    # =======================
+    # 2. TOP CARDS
+    # =======================
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Predicción 2 meses</div>
+                <div class="kpi-value">${total:,.0f}</div>
+                <div class="kpi-subtext">{primer_mes_str} + {segundo_mes_str}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col2:
+        st.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Primer Mes</div>
+                <div class="kpi-value">${mes1:,.0f}</div>
+                <div class="kpi-subtext">{primer_mes_str}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col3:
+        st.markdown(
+            f"""
+            <div class="kpi-card">
+                <div class="kpi-label">Segundo Mes</div>
+                <div class="kpi-value">${mes2:,.0f}</div>
+                <div class="kpi-subtext">{segundo_mes_str}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    # # =======================
+    # # 2.1. NUEVAS CARDS DE INGRESOS POR REGIÓN Y CATEGORÍA
+    # # =======================
+
+    # # ---- Ingresos por Región ----
+    # df_region = pd.read_parquet("prediccion_region.parquet")
+    # df_region['fecha'] = pd.to_datetime(df_region['fecha'])
+    # df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
+    # ingresos_region_total = df_region.groupby('region')['prediccion'].sum().sort_values(ascending=False)
+    # ingresos_region_mes = df_region.groupby(['region', 'mes'])['prediccion'].sum().unstack(fill_value=0)
+    # ingresos_region_mes['Total'] = ingresos_region_mes.sum(axis=1)
+
+    # # ---- Ingresos por Categoría ----
+    # df_categoria = pd.read_parquet("prediccion_categoria.parquet")
+    # df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
+    # df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
+    # ingresos_categoria_total = df_categoria.groupby('categoria_simplificada')['prediccion'].sum().sort_values(ascending=False)
+    # ingresos_categoria_mes = df_categoria.groupby(['categoria_simplificada', 'mes'])['prediccion'].sum().unstack(fill_value=0)
+    # ingresos_categoria_mes['Total'] = ingresos_categoria_mes.sum(axis=1)
+
+    # col4, col5 = st.columns(2)
+    # with col4:
+    #     st.markdown(
+    #         f"""
+    #         <div class="kpi-card">
+    #             <div class="kpi-label">Ingresos por Región</div>
+    #             <div class="kpi-value">${ingresos_region_total.sum():,.0f}</div>
+    #             <div class="kpi-subtext">Total 2 meses</div>
+    #         </div>
+    #         """,
+    #         unsafe_allow_html=True
+    #     )
+
+    # with col5:
+    #     st.markdown(
+    #         f"""
+    #         <div class="kpi-card">
+    #             <div class="kpi-label">Ingresos por Categoría</div>
+    #             <div class="kpi-value">${ingresos_categoria_total.sum():,.0f}</div>
+    #             <div class="kpi-subtext">Total 2 meses</div>
+    #         </div>
+    #         """,
+    #         unsafe_allow_html=True
+    #     )
+
+    # # =======================
+    # # 3. GRÁFICA DIARIA COMPARATIVA
+    # =======================
+    st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Predicción Diaria Total</h4>", unsafe_allow_html=True)
+    if not df_diario.empty and 'prediccion' in df_diario.columns:
+        df_diario = df_diario.sort_values('fecha')
+        fig_diario = go.Figure()
+        fig_diario.add_trace(go.Scatter(
+            x=df_diario['fecha'],
+            y=df_diario['prediccion'],
+            mode='lines+markers',
+            name='Predicción Diaria Total',
+            line=dict(color='#2563EB', width=3),
+            marker=dict(size=6, color='#2563EB')
+        ))
+        fig_diario.update_layout(
+            height=400,
+            plot_bgcolor="#FFF",
+            paper_bgcolor="#FFF",
+            xaxis_title="Fecha",
+            yaxis_title="Ingresos Diarios ($)",
+            margin=dict(l=10, r=10, t=40, b=30),
+            font=dict(family="sans-serif", color="#222", size=14),
+            showlegend=False
+        )
+        st.plotly_chart(fig_diario, use_container_width=True)
+    else:
+        st.error("No se pueden cargar los datos de predicción diaria")
+
+    # =======================
+    # 4. GRÁFICA DE DOBLE BARRA POR REGIÓN
+    # =======================
+    st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo Regional Mensual</h4>", unsafe_allow_html=True)
+    df_region = pd.read_parquet("prediccion_region.parquet")
+    df_region['fecha'] = pd.to_datetime(df_region['fecha'])
+    df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
+    df_region_pivot = df_region.groupby(['mes', 'region'])['prediccion'].sum().unstack(fill_value=0)
+
+    total_region = df_region_pivot.sum(axis=0).sort_values(ascending=False)
+    df_region_pivot = df_region_pivot[total_region.index]
+
+    meses_region = sorted(df_region_pivot.index)
+    if len(meses_region) >= 2:
+        primer_mes_region = meses_region[0]
+        segundo_mes_region = meses_region[1]
+        fig_region = go.Figure()
+        fig_region.add_trace(go.Bar(
+            x=df_region_pivot.columns,
+            y=df_region_pivot.loc[primer_mes_region],
+            name=f'{primer_mes_region}',
+            marker_color='#3B82F6',
+            text=df_region_pivot.loc[primer_mes_region].apply(lambda x: f'${x:,.0f}'),
+            textposition='outside'
+        ))
+        fig_region.add_trace(go.Bar(
+            x=df_region_pivot.columns,
+            y=df_region_pivot.loc[segundo_mes_region],
+            name=f'{segundo_mes_region}',
+            marker_color='#1E40AF',
+            text=df_region_pivot.loc[segundo_mes_region].apply(lambda x: f'${x:,.0f}'),
+            textposition='outside'
+        ))
+        fig_region.update_layout(
+            barmode='group',
+            height=400,
+            plot_bgcolor="#FFF",
+            paper_bgcolor="#FFF",
+            xaxis_title="Región",
+            yaxis_title="Ingresos ($)",
+            margin=dict(l=10, r=10, t=40, b=30),
+            xaxis=dict(tickangle=45),
+            font=dict(family="sans-serif", color="#222", size=14)
+        )
+        st.plotly_chart(fig_region, use_container_width=True)
+
+    # =======================
+    # 5. GRÁFICA DE DOBLE BARRA POR CATEGORÍA
+    # =======================
+    st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo por Categoría</h4>", unsafe_allow_html=True)
+    df_categoria = pd.read_parquet("prediccion_categoria.parquet")
+    df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
+    df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
+    col_categoria = 'categoria_simplificada'
+    df_categoria_pivot = df_categoria.groupby(['mes', col_categoria])['prediccion'].sum().unstack(fill_value=0)
+
+    total_categoria = df_categoria_pivot.sum(axis=0).sort_values(ascending=False)
+    df_categoria_pivot = df_categoria_pivot[total_categoria.index]
+
+    meses_cat = sorted(df_categoria_pivot.index)
+    if len(meses_cat) >= 2:
+        primer_mes_cat = meses_cat[0]
+        segundo_mes_cat = meses_cat[1]
+        fig_cat = go.Figure()
+        fig_cat.add_trace(go.Bar(
+            x=df_categoria_pivot.columns,
+            y=df_categoria_pivot.loc[primer_mes_cat],
+            name=f'{primer_mes_cat}',
+            marker_color='#3B82F6',
+            text=df_categoria_pivot.loc[primer_mes_cat].apply(lambda x: f'${x:,.0f}'),
+            textposition='outside'
+        ))
+        fig_cat.add_trace(go.Bar(
+            x=df_categoria_pivot.columns,
+            y=df_categoria_pivot.loc[segundo_mes_cat],
+            name=f'{segundo_mes_cat}',
+            marker_color='#1E40AF',
+            text=df_categoria_pivot.loc[segundo_mes_cat].apply(lambda x: f'${x:,.0f}'),
+            textposition='outside'
+        ))
+        fig_cat.update_layout(
+            barmode='group',
+            height=400,
+            plot_bgcolor="#FFF",
+            paper_bgcolor="#FFF",
+            xaxis_title="Categoría",
+            yaxis_title="Ingresos ($)",
+            margin=dict(l=10, r=10, t=40, b=30),
+            xaxis=dict(tickangle=45),
+            font=dict(family="sans-serif", color="#222", size=14)
+        )
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+    # =======================
+    # 6. VISUALIZADOR DE ARCHIVOS PARQUET
+    # =======================
+    st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Visualizador de Archivos</h4>", unsafe_allow_html=True)
+    archivos = [
+        ("Predicción Diaria", "prediccion_diaria.parquet"),
+        ("Predicción por Región", "prediccion_region.parquet"),
+        ("Predicción por Categoría", "prediccion_categoria.parquet"),
+    ]
+    opcion_sel = st.selectbox("Selecciona el archivo a visualizar", 
+                            [nombre for nombre, _ in archivos], 
+                            key="parquet_selector_pred")
+    archivo_seleccionado = dict(archivos)[opcion_sel]
+    
+    if os.path.exists(archivo_seleccionado):
+        df_viz = pd.read_parquet(archivo_seleccionado)
+        st.dataframe(df_viz, use_container_width=True, hide_index=True)
 
 with tab3:
     st.markdown("<div id='panel-individual'></div>", unsafe_allow_html=True)
