@@ -19,9 +19,6 @@ COLOR_ACCENT = "#009944"
 COLOR_NEGATIVE = "#E14B64"
 COLOR_BG = "#e0e0e0"
 
-# --------------------------------------
-# Funciones auxiliares para manejar colores (mapa)
-# --------------------------------------
 def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     hex_color = hex_color.lstrip("#")
     return (
@@ -44,21 +41,33 @@ def blend_with_white(base_rgb: tuple[int, int, int], pct: float) -> str:
     )
     return rgb_to_hex(blended)
 
-# --------------------------------------
-# 1. Definir un único color base (púrpura) para el mapa
-# --------------------------------------
-COLOR_BASE_HEX = "#3E08A9"  # Púrpura intenso
+COLOR_BASE_HEX = "#3E08A9"
 BASE_RGB = hex_to_rgb(COLOR_BASE_HEX)
-
-# --------------------------------------
-# 2. Diálogos (sin cambios)
-# --------------------------------------
 
 custom_blue_scale = [
     [0.0, '#3B82F6'],
     [0.5, '#1E40AF'],
     [1.0, '#0B2447']
 ]
+
+def extract_section(text, header):
+    """Extrae las líneas de una sección específica del texto de alertas."""
+    lines = text.splitlines()
+    start = None
+    end = None
+    for i, line in enumerate(lines):
+        if header in line:
+            start = i + 1
+            break
+    if start is None:
+        return []
+    for j in range(start, len(lines)):
+        if lines[j].strip() == "" or (":" in lines[j] and j != start):
+            end = j
+            break
+    if end is None:
+        end = len(lines)
+    return [l for l in lines[start:end] if l.strip()]
 
 @st.dialog(" ", width="large")
 def dialog_caidas_categoria():
@@ -69,14 +78,14 @@ def dialog_caidas_categoria():
         st.warning("No se encontró el archivo alertas.txt")
         return
 
+    caidas_lines = extract_section(alertas_texto, "Categorías con caída de más del 15% en ingreso mensual:")
     pat_categoria = re.compile(r"(.+?) bajó ([\d\.]+)%")
-    categorias = []
-    caidas = []
-    for linea in alertas_texto.splitlines():
+    categorias, caidas = [], []
+    for linea in caidas_lines:
         m = pat_categoria.search(linea)
         if m:
             categorias.append(m.group(1).strip())
-            caidas.append(float(m.group(2)))
+            caidas.append(round(float(m.group(2)), 2))
     df_caidas = pd.DataFrame({"Categoría": categorias, "Caída (%)": caidas})
 
     if not df_caidas.empty:
@@ -84,11 +93,15 @@ def dialog_caidas_categoria():
             df_caidas, x="Categoría", y="Caída (%)", color="Caída (%)",
             color_continuous_scale=custom_blue_scale, title="Caída porcentual por categoría"
         )
+        fig.update_traces(
+            hovertemplate='%{x}<br>Caída: %{y:,.2f}%<extra></extra>'
+        )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.code(
         "Categorías con caída de más del 15% en ingreso mensual:\n" +
-        "\n".join([f"{cat} bajó {val:.2f}%" for cat, val in zip(categorias, caidas)]),
+        "\n".join([f"{cat} bajó {val:,.2f}%" for cat, val in zip(categorias, caidas)]),
         language="markdown"
     )
     if st.button("Cerrar"):
@@ -103,20 +116,20 @@ def dialog_disminucion_categoria():
         st.warning("No se encontró el archivo alertas.txt")
         return
 
-    pat_ingreso = re.compile(r"(.+?) \(([\d\.]+) -> ([\d\.]+), pérdida aprox: \$([\d\.]+)\)")
-    cat_ingreso, ingreso_ini, ingreso_fin, perdida = [], [], [], []
-    for linea in alertas_texto.splitlines():
+    categoria_lines = extract_section(alertas_texto, "Categorías con disminución de ingreso promedio mensual:")
+    pat_ingreso = re.compile(r"(.+?) \(([\d\.,]+) -> ([\d\.,]+)\)")
+    cat_ingreso, ingreso_ini, ingreso_fin = [], [], []
+    for linea in categoria_lines:
         m = pat_ingreso.search(linea)
         if m:
             cat_ingreso.append(m.group(1).strip())
-            ingreso_ini.append(float(m.group(2)))
-            ingreso_fin.append(float(m.group(3)))
-            perdida.append(float(m.group(4)))
+            ingreso_ini.append(round(float(m.group(2).replace(",", "")), 2))
+            ingreso_fin.append(round(float(m.group(3).replace(",", "")), 2))
     df_perdidas = pd.DataFrame({
         "Categoría": cat_ingreso,
         "Ingreso Inicial": ingreso_ini,
         "Ingreso Final": ingreso_fin,
-        "Pérdida ($)": perdida
+        "Pérdida ($)": [round(ini - fin, 2) for ini, fin in zip(ingreso_ini, ingreso_fin)]
     })
 
     if not df_perdidas.empty:
@@ -124,13 +137,17 @@ def dialog_disminucion_categoria():
             df_perdidas, x="Categoría", y="Pérdida ($)", color="Pérdida ($)",
             color_continuous_scale=custom_blue_scale, title="Pérdida monetaria por categoría"
         )
+        fig.update_traces(
+            hovertemplate='%{x}<br>Pérdida: $%{y:,.2f}<extra></extra>'
+        )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.code(
         "Categorías con disminución de ingreso promedio mensual:\n" +
         "\n".join([
-            f"{cat} ({ini:.2f} -> {fin:.2f}, pérdida aprox: ${perd:,.2f})"
-            for cat, ini, fin, perd in zip(cat_ingreso, ingreso_ini, ingreso_fin, perdida)
+            f"{cat} ({ini:,.2f} -> {fin:,.2f})"
+            for cat, ini, fin in zip(cat_ingreso, ingreso_ini, ingreso_fin)
         ]),
         language="markdown"
     )
@@ -146,20 +163,72 @@ def dialog_disminucion_region():
         st.warning("No se encontró el archivo alertas.txt")
         return
 
-    pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.]+) -> ([\d\.]+), pérdida: \$([\d\.]+)\)")
-    regiones, ingreso_ini, ingreso_fin, perdida = [], [], [], []
-    for linea in alertas_texto.splitlines():
+    region_lines = extract_section(alertas_texto, "Regiones con disminución de ingreso promedio mensual:")
+    pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.,]+) -> ([\d\.,]+)\)")
+    regiones, ingreso_ini, ingreso_fin = [], [], []
+    for linea in region_lines:
         m = pat_region.search(linea)
         if m:
             regiones.append(m.group(1).strip())
-            ingreso_ini.append(float(m.group(2)))
-            ingreso_fin.append(float(m.group(3)))
-            perdida.append(float(m.group(4)))
+            ingreso_ini.append(round(float(m.group(2).replace(",", "")), 2))
+            ingreso_fin.append(round(float(m.group(3).replace(",", "")), 2))
     df_regiones = pd.DataFrame({
         "Región": regiones,
         "Ingreso Inicial": ingreso_ini,
         "Ingreso Final": ingreso_fin,
-        "Pérdida ($)": perdida
+        "Pérdida ($)": [round(ini - fin, 2) for ini, fin in zip(ingreso_ini, ingreso_fin)]
+    })
+
+    if not df_regiones.empty:
+        fig = px.bar(
+            df_regiones,
+            x='Región',
+            y='Pérdida ($)',
+            color='Pérdida ($)',
+            color_continuous_scale=custom_blue_scale,
+            title='Pérdida monetaria por región'
+        )
+        fig.update_traces(
+            hovertemplate='%{x}<br>Pérdida: $%{customdata:,.2f}<extra></extra>',
+            customdata=df_regiones[['Pérdida ($)']].values
+        )
+        fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
+        st.plotly_chart(fig, use_container_width=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.code(
+        "Regiones con disminución de ingreso promedio mensual:\n" +
+        "\n".join([
+            f"{reg} ({ini:,.2f} -> {fin:,.2f})"
+            for reg, ini, fin in zip(regiones, ingreso_ini, ingreso_fin)
+        ]),
+        language="markdown"
+    )
+    if st.button("Cerrar"):
+        st.rerun()
+
+@st.dialog(" ", width="large")
+def dialog_disminucion_region():
+    try:
+        with open("alertas.txt", "r", encoding="utf-8") as f:
+            alertas_texto = f.read()
+    except FileNotFoundError:
+        st.warning("No se encontró el archivo alertas.txt")
+        return
+
+    region_lines = extract_section(alertas_texto, "Regiones con disminución de ingreso promedio mensual:")
+    pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.,]+) -> ([\d\.,]+)\)")
+    regiones, ingreso_ini, ingreso_fin = [], [], []
+    for linea in region_lines:
+        m = pat_region.search(linea)
+        if m:
+            regiones.append(m.group(1).strip())
+            ingreso_ini.append(float(m.group(2).replace(",", "")))
+            ingreso_fin.append(float(m.group(3).replace(",", "")))
+    df_regiones = pd.DataFrame({
+        "Región": regiones,
+        "Ingreso Inicial": ingreso_ini,
+        "Ingreso Final": ingreso_fin,
+        "Pérdida ($)": [ini - fin for ini, fin in zip(ingreso_ini, ingreso_fin)]
     })
 
     if not df_regiones.empty:
@@ -169,40 +238,32 @@ def dialog_disminucion_region():
         )
         fig.update_layout(height=350, plot_bgcolor="#FFF", paper_bgcolor="#FFF")
         st.plotly_chart(fig, use_container_width=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.code(
         "Regiones con disminución de ingreso promedio mensual:\n" +
         "\n".join([
-            f"{reg} ({ini:.2f} -> {fin:.2f}, pérdida: ${perd:,.2f})"
-            for reg, ini, fin, perd in zip(regiones, ingreso_ini, ingreso_fin, perdida)
+            f"{reg} ({ini:,.2f} -> {fin:,.2f})"
+            for reg, ini, fin in zip(regiones, ingreso_ini, ingreso_fin)
         ]),
         language="markdown"
     )
     if st.button("Cerrar"):
         st.rerun()
 
-# --------------------------------------
-# 3. Configuración de la página y estilos
-# --------------------------------------
 st.set_page_config(page_title="Ingresos y Proyecciones", layout="wide", page_icon="🚚", initial_sidebar_state="expanded")
 
 st.markdown(f"""
     <style>
-    /* ========== GENERAL ========== */
-           
     div.block-container {{
         padding-top: 0rem !important;
     }}
     div.stApp {{
         padding-top: 0rem !important;
     }}
-            
-    /* ========== SIDEBAR GENERAL ========== */
     section[data-testid="stSidebar"] {{
         background-color: {COLOR_BG};
         width: 400px !important;
     }}
-
-    /* ========== TEXTO MÁS GRANDE EN TÍTULOS DE FILTROS ========== */
     section[data-testid="stSidebar"] label {{
         font-size: 3.5rem !important;
         font-weight: 600 !important;
@@ -225,7 +286,6 @@ st.markdown(f"""
         font-weight: 700 !important;
     }}
 
-    /* ========== FILTROS CON BORDE Y VISIBILIDAD ========== */
     section[data-testid="stSidebar"] div[data-baseweb="select"] {{
         border: 2px solid {COLOR_PRIMARY} !important;
         border-radius: 8px !important;
@@ -250,7 +310,6 @@ st.markdown(f"""
         color: {COLOR_PRIMARY} !important;
     }}
 
-    /* ========== RECOMENDACIONES ========== */
     section[data-testid="stSidebar"] .stCheckbox {{
         transform: scale(1.3) !important;
     }}
@@ -271,8 +330,6 @@ st.markdown(f"""
         color: #FFFFFF !important;
     }}
 
-    /* ========== TABS ========== */
-
     div[data-testid="stTabs"] [role="tablist"] > div:last-child {{
         display: none !important;
     }}
@@ -289,7 +346,6 @@ st.markdown(f"""
         border-bottom: 3px solid #0E2148 !important;
     }}
 
-    /* ========== FILE UPLOADER ========== */
     section[data-testid="stSidebar"] .stFileUploader {{
         border: 2.5px dashed {COLOR_PRIMARY} !important;
         border-radius: 12px !important;
@@ -304,7 +360,6 @@ st.markdown(f"""
         color: {COLOR_PRIMARY} !important;
     }}
 
-    /* ========== KPI CARDS  ========== */
     .kpi-card {{
         background: #FFF;
         border-radius: 16px;
@@ -372,9 +427,6 @@ st.markdown(
         unsafe_allow_html=True
         )
 
-# --------------------
-# Sidebar con filtros y recomendaciones
-# --------------------
 with st.sidebar:
     try:
         st.image("logo_danu.png", width=180)
@@ -437,7 +489,6 @@ with st.sidebar:
         if col_text3.button("Disminución de ingreso por categoría", key="btn_rec2"):
             dialog_disminucion_categoria()
 
-    # Título grande antes del uploader
     st.markdown(
          "<span style='font-size:1.6rem; font-weight:700; color:#001A57;'>Subir base de datos</span>",
         unsafe_allow_html=True
@@ -458,7 +509,6 @@ with st.sidebar:
                 'region': 'category',
                 'categoria_simplificada': 'category'
             }
-            # Carga eficiente solo columnas necesarias
             if file_extension == "csv":
                 df = pd.read_csv(uploaded_file, usecols=usecols, dtype=dtype)
             elif file_extension in ["xlsx", "xls"]:
@@ -469,14 +519,9 @@ with st.sidebar:
             else:
                 df = pd.read_csv(uploaded_file, sep=None, engine='python', usecols=usecols, dtype=dtype)
 
-            # Preprocesamiento crítico
             df['orden_compra_timestamp'] = pd.to_datetime(df['orden_compra_timestamp'], errors='coerce')
             df = df.dropna(subset=['orden_compra_timestamp'])
 
-            # NO establecer 'orden_compra_timestamp' como índice aquí
-            # NO hacer reset_index() aquí
-
-            # Guardar parquet optimizado sin índice
             df.to_parquet("df_DataBridgeConsulting.parquet", index=False)
             st.session_state['df'] = df
             st.success("¡Archivo cargado exitosamente!")
@@ -513,23 +558,17 @@ with st.sidebar:
     else:
         df_pred = pd.DataFrame()
 
-# --------------------
-# Función de filtrado
-# --------------------
 @st.cache_data(ttl=3600, show_spinner="Aplicando filtros...")
 def aplicar_filtros(df, periodo, region, categoria):
     df_filtrado = df.copy()
 
-    # Si necesitas trabajar con la columna, resetea el índice:
-    df_filtrado = df_filtrado.reset_index()  # Ahora 'orden_compra_timestamp' es columna
+    df_filtrado = df_filtrado.reset_index()
 
-    # Ya puedes hacer operaciones con la columna:
     df_filtrado['orden_compra_timestamp'] = pd.to_datetime(df_filtrado['orden_compra_timestamp'], errors='coerce')
     df_filtrado = df_filtrado.dropna(subset=['orden_compra_timestamp'])
 
     fecha_max = df_filtrado['orden_compra_timestamp'].max()
 
-    # Filtrado por periodo
     if periodo == "Último año":
         fecha_limite = fecha_max - pd.DateOffset(years=1)
     elif periodo == "Últimos 6 meses":
@@ -546,13 +585,8 @@ def aplicar_filtros(df, periodo, region, categoria):
     if categoria != "Todas las categorías":
         df_filtrado = df_filtrado[df_filtrado['categoria_simplificada'] == categoria]
 
-    return df_filtrado  # Ya no necesitas reset_index aquí, ya es columna
+    return df_filtrado
 
-
-
-# --------------------
-# Lógica principal: mostrar métricas y gráficos
-# --------------------
 tab1, tab2, tab3 = st.tabs(["Tablero", "Predicciones", "Hallazgos estrategicos y preguntas tecnicas"])
 with tab1:
     if 'df' in st.session_state:
@@ -568,32 +602,25 @@ with tab1:
             df_filtrado['mes'] = df_filtrado['orden_compra_timestamp'].dt.month
             df_filtrado['trimestre'] = df_filtrado['orden_compra_timestamp'].dt.quarter
 
-        # ►►► CÓDIGO CORREGIDO ▼▼▼ (reemplazar todo el bloque de métricas)
-        # 1. Determinar fechas del periodo actual filtrado
         fecha_min = df_filtrado['orden_compra_timestamp'].min()
         fecha_max = df_filtrado['orden_compra_timestamp'].max()
 
-        # 2. Calcular periodo equivalente del año anterior
         fecha_min_anterior = fecha_min - pd.DateOffset(years=1)
         fecha_max_anterior = fecha_max - pd.DateOffset(years=1)
 
-        # 3. Filtrar datos del año anterior CON LOS MISMOS FILTROS
         df_anterior = st.session_state['df'].copy()
-        df_anterior = df_anterior.reset_index()  # <--- AGREGA ESTA LÍNEA
+        df_anterior = df_anterior.reset_index()
         df_anterior['orden_compra_timestamp'] = pd.to_datetime(df_anterior['orden_compra_timestamp'])
         df_anterior = df_anterior[
             (df_anterior['orden_compra_timestamp'] >= fecha_min_anterior) & 
             (df_anterior['orden_compra_timestamp'] <= fecha_max_anterior)
         ]
 
-        # Aplicar mismos filtros de región y categoría al periodo anterior
         if region_sel != "Todas las regiones":
             df_anterior = df_anterior[df_anterior['region'] == region_sel]
         if categoria_sel != "Todas las categorías":
             df_anterior = df_anterior[df_anterior['categoria_simplificada'] == categoria_sel]
 
-        # 4. Calcular TODAS las métricas con el nuevo método
-        # Ingresos
         ingresos_totales = df_filtrado['precio_final'].sum()
         ingresos_periodo_actual = df_filtrado['precio_final'].sum()
         ingresos_periodo_anterior = df_anterior['precio_final'].sum()
@@ -602,7 +629,6 @@ with tab1:
             if ingresos_periodo_anterior > 0 else 0.0
         )
 
-        # Pedidos
         pedidos_totales = df_filtrado['order_id'].nunique()
         pedidos_periodo_actual = df_filtrado['order_id'].nunique()
         pedidos_periodo_anterior = df_anterior['order_id'].nunique()
@@ -611,7 +637,6 @@ with tab1:
             if pedidos_periodo_anterior > 0 else 0.0
         )
 
-        # Valor promedio
         valor_promedio_actual = (
             ingresos_periodo_actual / pedidos_periodo_actual 
             if pedidos_periodo_actual > 0 else 0
@@ -625,7 +650,6 @@ with tab1:
             if valor_promedio_anterior > 0 else 0.0
         )
 
-        # Flete promedio
         flete_promedio_actual = df_filtrado['costo_de_flete'].mean()
         flete_promedio_anterior = df_anterior['costo_de_flete'].mean()
         delta_flete = (
@@ -637,7 +661,7 @@ with tab1:
             "Últimos 6 meses": "vs mismos 6 meses año anterior",
             "Últimos 3 meses": "vs mes anterior",
         }
-        # KPI Cards
+
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
@@ -702,7 +726,6 @@ with tab1:
 
             st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-            # Gráfico de Tendencia Mensual
             st.markdown(
                 f"<h4 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
                 "Tendencia de Ingresos Mensuales</h4>",
@@ -719,7 +742,6 @@ with tab1:
                 MIN_DIAS_MES = 28
                 meses_validos = dias_por_mes[dias_por_mes['DiasRegistrados'] >= MIN_DIAS_MES][['Año', 'Mes']]
             else:
-                # Tomar todos los meses sin filtrar por días
                 meses_validos = dias_por_mes[['Año', 'Mes']]
 
             df_mensual = df_filtrado.groupby(['Año', 'Mes'])['precio_final'].sum().reset_index()
@@ -750,7 +772,6 @@ with tab1:
 
             fig_tendencia = go.Figure()
 
-        # Línea de datos reales
         if not df_real.empty:
             fig_tendencia.add_trace(go.Scatter(
                 x=df_real["MesIndex"],
@@ -761,10 +782,11 @@ with tab1:
                 marker=dict(size=8, color="#3B82F6")
             ))
 
-            # Línea de predicción solo si hay predicción y datos reales
-            # Solo mostrar la línea de predicción si los filtros están en "Todas"
             mostrar_prediccion = (region_sel == "Todas las regiones") and (categoria_sel == "Todas las categorías")
             
+            alerta_activada = rec1 or rec2 or rec3
+            num_checks = sum([rec1, rec2, rec3])
+
             if mostrar_prediccion and not df_pred_plot.empty and not df_real.empty:
                 fig_tendencia.add_trace(go.Scatter(
                     x=[df_real["MesIndex"].iloc[-1]] + df_pred_plot["MesIndex"].tolist(),
@@ -777,6 +799,39 @@ with tab1:
                         color=['#7B3FF2'] + ['#555555'] * len(df_pred_plot)
                     )
                 ))
+
+                if alerta_activada:
+                    total_meses = len(df_pred_plot)
+                    tercios = [int(np.ceil(total_meses / 3 * i)) for i in range(1, 4)]
+                    meses_a_mostrar = tercios[num_checks - 1] if num_checks > 0 else 0
+                    
+                    x_alerta = [df_real["MesIndex"].iloc[-1]]
+                    y_alerta = [df_real["precio_final"].iloc[-1]]
+                    
+                    for i, (mes, valor) in enumerate(zip(df_pred_plot["MesIndex"], df_pred_plot["precio_final"])):
+                        if i < meses_a_mostrar:
+                            y_alerta.append(valor * 1.05)
+                            x_alerta.append(mes)
+                    
+                    if len(x_alerta) > 1:
+                        fig_tendencia.add_trace(go.Scatter(
+                            x=x_alerta,
+                            y=y_alerta,
+                            mode='lines+markers',
+                            name=f'Alerta +5% ({num_checks}/3)',
+                            line=dict(
+                                color='#38A86F',
+                                width=3,
+                                dash='solid'
+                            ),
+                            marker=dict(
+                                size=8,
+                                color='#38A86F',
+                                symbol='diamond'
+                            ),
+                            connectgaps=True,
+                            showlegend=True
+                        ))
 
                 last_real_x = df_real["MesIndex"].iloc[-1]
                 last_min = min(df_real["precio_final"].iloc[-1], df_real["precio_final"].iloc[-1])
@@ -821,7 +876,7 @@ with tab1:
                     tickvals=df_total["MesIndex"],
                     ticktext=[row['MesAbrev'] for _, row in df_total.iterrows()],
                     tickfont=dict(
-                        size=18,  # Más grande
+                        size=18,
                         family="sans-serif",
                         color="#222",
                     )
@@ -830,10 +885,10 @@ with tab1:
                     title=None,
                     showgrid=True,
                     gridcolor="#b0b0b0",
-                    gridwidth=2,          # Más grueso
+                    gridwidth=2,
                     rangemode="tozero",
                     tickfont=dict(
-                        size=18,  # Más grande
+                        size=18,
                         family="sans-serif",
                         color="#222",
                     )
@@ -854,7 +909,6 @@ with tab1:
 
             st.plotly_chart(fig_tendencia, use_container_width=True)
 
-            # Gráficos por Región y Categoría
             col5, col6 = st.columns(2)
             with col5:
                 st.markdown(
@@ -863,9 +917,6 @@ with tab1:
                     unsafe_allow_html=True
                 )
 
-                # ----------------------------
-                # Construcción del mapa
-                # ----------------------------
                 ingresos_region = df_filtrado.groupby('region')['precio_final'].sum()
                 total_ingresos_region = ingresos_region.sum()
                 region_percent_map = (ingresos_region / total_ingresos_region * 100).round(1).to_dict()
@@ -937,7 +988,6 @@ with tab1:
                         feature["properties"]["percent_label"] = f"{int(pct_geo)}%"
                         feature["properties"]["ingresos"] = ingresos_geo
 
-                # Redefinimos el color base si lo deseas
                 BASE_RGB = (0, 26, 87)
 
                 def style_function(feature):
@@ -958,7 +1008,7 @@ with tab1:
 
                     intensidad = (pct_feat - min_pct_map) / rango_map if rango_map > 0 else 1.0
                     intensidad = max(min(intensidad, 1.0), 0.0)
-                    blend_pct = 30 + 70 * intensidad  # del 30% al 100%
+                    blend_pct = 30 + 70 * intensidad
                     fill_color_hex = blend_with_white(BASE_RGB, blend_pct)
 
                     return {
@@ -968,7 +1018,6 @@ with tab1:
                         "fillOpacity": 0.8,
                     }
 
-                # Creamos y mostramos el mapa
                 m = folium.Map(location=[23.0, -102.0], zoom_start=5, tiles="cartodbpositron")
                 folium.GeoJson(
                     data=mexico_geo,
@@ -984,7 +1033,6 @@ with tab1:
                 map_html = m.get_root().render()
                 components.html(map_html, height=400, width=1200)
 
-
             with col6:
                 st.markdown(
                     f"<h5 style='color:{COLOR_PRIMARY}; font-size:1.75rem; margin-bottom:0.5rem;'>"
@@ -992,7 +1040,6 @@ with tab1:
                     unsafe_allow_html=True
                 )
 
-                # 1) Preparamos los datos
                 bar_data = (
                     df_filtrado
                     .groupby('categoria_simplificada')['costo_de_flete']
@@ -1006,18 +1053,15 @@ with tab1:
                     .reset_index(drop=True)
                 )
 
-                # 2) Etiqueta: primera palabra, salvo 'No Proporcionado'
                 bar_data['Etiqueta'] = bar_data['Categoría'].apply(
                     lambda cat: cat if cat == "No proporcionado" else cat.split()[0]
                 )
 
-                # 3) Colores top 3 / resto
                 colors = [
                     COLOR_PRIMARY if i < 3 else "#27548A"
                     for i in range(len(bar_data))
                 ]
 
-                # 4) Dibujamos la barra usando 'Etiqueta' para ticks
                 fig_bar = go.Figure(go.Bar(
                     x=bar_data['Etiqueta'],
                     y=bar_data['Costo Promedio de Flete'],
@@ -1025,7 +1069,7 @@ with tab1:
                     text=bar_data['Costo Promedio de Flete'].map(lambda v: f"${v:.2f}"),
                     textposition='inside',
                     textfont=dict(color='white', size=16),
-                    customdata=bar_data['Categoría'],  # para hover
+                    customdata=bar_data['Categoría'],
                     hovertemplate="<b>%{customdata}</b><br>Costo: %{y:.2f}<extra></extra>"
                 ))
 
@@ -1095,7 +1139,7 @@ with tab1:
                 "Ingresos por Región</h5>",
                 unsafe_allow_html=True
             )
-            # Mapa en estado 'sin datos'
+
             fig_empty_map = px.scatter_mapbox(pd.DataFrame({'lat': [], 'lon': []}), lat='lat', lon='lon')
             fig_empty_map.update_layout(
                 mapbox={'style': "open-street-map", 'zoom': 4, 'center': {'lat': 23.0, 'lon': -102.0}},
@@ -1119,19 +1163,15 @@ with tab2:
         unsafe_allow_html=True
     )
 
-    # Verificar SI los archivos parquet existen Y se subió la base
     parquet_files = [
         "prediccion_diaria.parquet",
         "prediccion_region.parquet",
         "prediccion_categoria.parquet"
     ]
     all_files_exist = all(os.path.exists(f) for f in parquet_files)
-    base_subida = 'df' in st.session_state  # Verifica si se subió el archivo principal
+    base_subida = 'df' in st.session_state
 
     if all_files_exist and base_subida:
-        # =======================
-        # 1. PREDICCIÓN DIARIA
-        # =======================
         df_diario = pd.read_parquet("prediccion_diaria.parquet")
         df_diario['fecha'] = pd.to_datetime(df_diario['fecha'])
         df_diario['mes'] = df_diario['fecha'].dt.to_period('M').astype(str)
@@ -1148,9 +1188,6 @@ with tab2:
             mes2 = 0
         total = mes1 + mes2
 
-        # =======================
-        # 2. TOP CARDS
-        # =======================
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(
@@ -1186,54 +1223,6 @@ with tab2:
                 unsafe_allow_html=True
             )
 
-        # # =======================
-        # # 2.1. NUEVAS CARDS DE INGRESOS POR REGIÓN Y CATEGORÍA
-        # # =======================
-
-        # # ---- Ingresos por Región ----
-        # df_region = pd.read_parquet("prediccion_region.parquet")
-        # df_region['fecha'] = pd.to_datetime(df_region['fecha'])
-        # df_region['mes'] = df_region['fecha'].dt.to_period('M').astype(str)
-        # ingresos_region_total = df_region.groupby('region')['prediccion'].sum().sort_values(ascending=False)
-        # ingresos_region_mes = df_region.groupby(['region', 'mes'])['prediccion'].sum().unstack(fill_value=0)
-        # ingresos_region_mes['Total'] = ingresos_region_mes.sum(axis=1)
-
-        # # ---- Ingresos por Categoría ----
-        # df_categoria = pd.read_parquet("prediccion_categoria.parquet")
-        # df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
-        # df_categoria['mes'] = df_categoria['fecha'].dt.to_period('M').astype(str)
-        # ingresos_categoria_total = df_categoria.groupby('categoria_simplificada')['prediccion'].sum().sort_values(ascending=False)
-        # ingresos_categoria_mes = df_categoria.groupby(['categoria_simplificada', 'mes'])['prediccion'].sum().unstack(fill_value=0)
-        # ingresos_categoria_mes['Total'] = ingresos_categoria_mes.sum(axis=1)
-
-        # col4, col5 = st.columns(2)
-        # with col4:
-        #     st.markdown(
-        #         f"""
-        #         <div class="kpi-card">
-        #             <div class="kpi-label">Ingresos por Región</div>
-        #             <div class="kpi-value">${ingresos_region_total.sum():,.0f}</div>
-        #             <div class="kpi-subtext">Total 2 meses</div>
-        #         </div>
-        #         """,
-        #         unsafe_allow_html=True
-        #     )
-
-        # with col5:
-        #     st.markdown(
-        #         f"""
-        #         <div class="kpi-card">
-        #             <div class="kpi-label">Ingresos por Categoría</div>
-        #             <div class="kpi-value">${ingresos_categoria_total.sum():,.0f}</div>
-        #             <div class="kpi-subtext">Total 2 meses</div>
-        #         </div>
-        #         """,
-        #         unsafe_allow_html=True
-        #     )
-
-        # # =======================
-        # # 3. GRÁFICA DIARIA COMPARATIVA
-        # =======================
         st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Predicción Diaria Total</h4>", unsafe_allow_html=True)
         if not df_diario.empty and 'prediccion' in df_diario.columns:
             df_diario = df_diario.sort_values('fecha')
@@ -1260,9 +1249,6 @@ with tab2:
         else:
             st.error("No se pueden cargar los datos de predicción diaria")
 
-        # =======================
-        # 4. GRÁFICA DE DOBLE BARRA POR REGIÓN
-        # =======================
         st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo Regional Mensual</h4>", unsafe_allow_html=True)
         df_region = pd.read_parquet("prediccion_region.parquet")
         df_region['fecha'] = pd.to_datetime(df_region['fecha'])
@@ -1306,9 +1292,6 @@ with tab2:
             )
             st.plotly_chart(fig_region, use_container_width=True)
 
-        # =======================
-        # 5. GRÁFICA DE DOBLE BARRA POR CATEGORÍA
-        # =======================
         st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Comparativo por Categoría</h4>", unsafe_allow_html=True)
         df_categoria = pd.read_parquet("prediccion_categoria.parquet")
         df_categoria['fecha'] = pd.to_datetime(df_categoria['fecha'])
@@ -1353,9 +1336,6 @@ with tab2:
             )
             st.plotly_chart(fig_cat, use_container_width=True)
 
-        # =======================
-        # 6. VISUALIZADOR DE ARCHIVOS PARQUET
-        # =======================
         st.markdown("<h4 style='color:#0E2148; margin-top:2.5rem; margin-bottom:1rem;'>Visualizador de Archivos</h4>", unsafe_allow_html=True)
         archivos = [
             ("Predicción Diaria", "prediccion_diaria.parquet"),
@@ -1380,19 +1360,14 @@ with tab2:
 
 with tab3:
     st.markdown("<div id='panel-individual'></div>", unsafe_allow_html=True)
-    # --------------------
-    # PANEL INDIVIDUAL – Hallazgos y preguntas tecnicas
-    # --------------------
-
     st.markdown("<div id='Hallazgos y preguntas tecnicas'></div>", unsafe_allow_html=True)
-
 
     perfil = st.selectbox("Selecciona tu perfil", ["Ejecutivo", "Analista", "Técnico"])
 
-    ingresos = 12037620  # entero
-    ticket_promedio = 92.83  # float
-    flete_promedio = 11.40  # float
-    precision_modelo = 0.83  # float
+    ingresos = 12037620
+    ticket_promedio = 92.83
+    flete_promedio = 11.40
+    precision_modelo = 0.83
 
     if perfil == "Ejecutivo":
         st.markdown(f"<h2 style='color: {COLOR_PRIMARY};'>🔹 Resumen Ejecutivo</h2>", unsafe_allow_html=True)
@@ -1417,11 +1392,10 @@ with tab3:
         st.divider()
 
         meses = ["Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
-        ingresos_mensuales = [0.67, 0.73, 0.78, 1.2, 0.89, 1.1, 1.0, 1.15, 1.16, 1.15, 1.05, 1.05]  # Valores estimados
+        ingresos_mensuales = [0.67, 0.73, 0.78, 1.2, 0.89, 1.1, 1.0, 1.15, 1.16, 1.15, 1.05, 1.05]
 
         df = pd.DataFrame({"Mes": meses, "Ingresos": ingresos_mensuales})
 
-        # Crear gráfica
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=df["Mes"],
@@ -1440,7 +1414,6 @@ with tab3:
             font=dict(size=14)
         )
         st.plotly_chart(fig, use_container_width=True)
-
 
         st.markdown(f"<h3 style='color: {COLOR_PRIMARY};'>✅ Acciones clave</h3>", unsafe_allow_html=True)
         st.markdown("""
@@ -1490,7 +1463,6 @@ with tab3:
             st.metric("💳 % Clientes Nuevos", "85%", "+3.4%")
 
         st.markdown("Este modelo predictivo permite anticipar ingresos del siguiente mes con una precisión promedio del 83%, utilizando técnicas de aprendizaje supervisado. La tasa de adquisición de nuevos clientes (85%) sugiere un crecimiento saludable y sostenido del mercado.")
-
 
     elif perfil == "Técnico":
         st.markdown(f"<h2 style='color: {COLOR_PRIMARY};'>🧠 KPIs Técnicos del Modelo</h2>", unsafe_allow_html=True)
@@ -1555,7 +1527,6 @@ with tab3:
             - Actualiza las variables relacionadas
             - Reentrena el modelo automáticamente
             """)
-
 
         with st.expander("🧩 ¿Qué variables son más importantes?", expanded=False):
             st.markdown("""
