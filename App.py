@@ -60,7 +60,7 @@ def dialog_caidas_categoria():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró el archivo alertas.txt")
+        st.warning("No se encontró ninguna Alerta")
         return
 
     pat_categoria = re.compile(r"(.+?) bajó ([\d\.]+)%")
@@ -94,7 +94,7 @@ def dialog_disminucion_categoria():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró el archivo alertas.txt")
+        st.warning("No se encontró ninguna Alerta")
         return
 
     pat_ingreso = re.compile(r"(.+?) \(([\d\.]+) -> ([\d\.]+), pérdida aprox: \$([\d\.]+)\)")
@@ -137,7 +137,7 @@ def dialog_disminucion_region():
         with open("alertas.txt", "r", encoding="utf-8") as f:
             alertas_texto = f.read()
     except FileNotFoundError:
-        st.warning("No se encontró el archivo alertas.txt")
+        st.warning("No se encontró ninguna Alerta")
         return
 
     pat_region = re.compile(r"([A-Za-zÁÉÍÓÚÑáéíóúñ ]+) \(([\d\.]+) -> ([\d\.]+), pérdida: \$([\d\.]+)\)")
@@ -412,7 +412,7 @@ with st.sidebar:
 
     st.markdown(
         f"<h4 style='margin-bottom: 0.5rem; color:{COLOR_PRIMARY}; font-size: 1.4rem;'>"
-        f"Recomendaciones ({progreso_recomendaciones}%)</h4>",
+        f"Alertas ({progreso_recomendaciones}%)</h4>",
         unsafe_allow_html=True
     )
 
